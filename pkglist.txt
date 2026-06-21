@@ -1,0 +1,110 @@
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║                    Package List - Arch Linux                    ║
+# ║          Danh sách gói cần thiết cho hệ thống Hyprland          ║
+# ║                                                                 ║
+# ║  Cài đặt: pacman -S --needed - < pkglist.txt                   ║
+# ║  Xuất danh sách hiện tại: pacman -Qqen > pkglist.txt            ║
+# ╚══════════════════════════════════════════════════════════════════╝
+
+# ── Base System ──────────────────────────────────────────────────
+base
+base-devel
+linux
+linux-headers
+linux-firmware
+
+# ── Bootloader ───────────────────────────────────────────────────
+grub
+efibootmgr
+os-prober
+
+# ── Network ──────────────────────────────────────────────────────
+networkmanager
+iwd
+bluez
+bluez-utils
+
+# ── NVIDIA Drivers ───────────────────────────────────────────────
+nvidia
+nvidia-utils
+nvidia-settings
+libva-nvidia-driver
+
+# ── Wayland / Hyprland ───────────────────────────────────────────
+hyprland
+xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
+xdg-utils
+wayland
+wayland-protocols
+qt5-wayland
+qt6-wayland
+
+# ── Terminal & Shell ─────────────────────────────────────────────
+kitty
+bash-completion
+
+# ── File Manager ─────────────────────────────────────────────────
+dolphin
+thunar
+
+# ── Status Bar & Notifications ───────────────────────────────────
+waybar
+mako
+
+# ── App Launcher ─────────────────────────────────────────────────
+hyprlauncher
+
+# ── Authentication Agent ─────────────────────────────────────────
+polkit-gnome
+
+# ── Input Method (Tiếng Việt) ────────────────────────────────────
+fcitx5
+fcitx5-gtk
+fcitx5-qt
+fcitx5-configtool
+fcitx5-bamboo          # AUR
+
+# ── Screenshot & Clipboard ──────────────────────────────────────
+grim
+slurp
+swappy
+wl-clipboard
+
+# ── Media & Audio ────────────────────────────────────────────────
+pipewire
+pipewire-alsa
+pipewire-pulse
+pipewire-jack
+wireplumber
+playerctl
+brightnessctl
+
+# ── Fonts ────────────────────────────────────────────────────────
+ttf-jetbrains-mono-nerd
+ttf-firacode-nerd
+noto-fonts
+noto-fonts-cjk
+noto-fonts-emoji
+
+# ── Development Tools ────────────────────────────────────────────
+git
+neovim
+lazygit
+ripgrep
+fd
+fzf
+bat
+eza
+stow
+
+# ── System Utilities ────────────────────────────────────────────
+man-db
+man-pages
+sudo
+wget
+curl
+unzip
+p7zip
+htop
+fastfetch

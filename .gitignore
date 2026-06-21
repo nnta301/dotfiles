@@ -1,0 +1,58 @@
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║                     .gitignore - Dotfiles                       ║
+# ╚══════════════════════════════════════════════════════════════════╝
+
+# ── OS / Desktop ─────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+*~
+
+# ── Shell History & Sessions ─────────────────────────────────────
+.bash_history
+.bash_history-*
+.bash_sessions/
+.lesshst
+.wget-hsts
+
+# ── Cache & Temp ─────────────────────────────────────────────────
+*.swp
+*.swo
+*.bak
+*.tmp
+*.log
+*.cache
+.cache/
+__pycache__/
+*.pyc
+
+# ── Sensitive / Credentials ──────────────────────────────────────
+.ssh/
+.gnupg/
+.netrc
+*.pem
+*.key
+*token*
+*secret*
+.env
+.env.*
+
+# ── Editor / IDE ─────────────────────────────────────────────────
+.vscode/
+.idea/
+*.code-workspace
+.local/
+
+# ── Node / Dev ───────────────────────────────────────────────────
+node_modules/
+.npm/
+package-lock.json
+
+# ── Hyprland runtime ────────────────────────────────────────────
+hyprland.lock
+.hyprland/
+
+# ── Misc ─────────────────────────────────────────────────────────
+*.o
+*.so
+*.a
