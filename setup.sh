@@ -197,6 +197,22 @@ enable_services() {
 }
 
 # ═══════════════════════════════════════════════════════════════════
+#  Bước 7: Dọn dẹp hệ thống
+# ═══════════════════════════════════════════════════════════════════
+cleanup_system() {
+    local cleanup_script="$DOTFILES_DIR/scripts/cleanup.sh"
+
+    if [[ ! -f "$cleanup_script" ]]; then
+        error "Không tìm thấy $cleanup_script"
+        exit 1
+    fi
+
+    info "Chạy script dọn dẹp hệ thống..."
+    bash "$cleanup_script"
+    success "Dọn dẹp hoàn tất!"
+}
+
+# ═══════════════════════════════════════════════════════════════════
 #  MAIN
 # ═══════════════════════════════════════════════════════════════════
 main() {
@@ -208,9 +224,10 @@ main() {
     echo "  2) Chỉ cài packages"
     echo "  3) Chỉ link config (stow)"
     echo "  4) Chỉ bật services"
-    echo "  5) Thoát"
+    echo "  5) Dọn dẹp hệ thống"
+    echo "  6) Thoát"
     echo ""
-    read -rp "$(echo -e "${CYAN}Lựa chọn [1-5]:${NC} ")" choice
+    read -rp "$(echo -e "${CYAN}Lựa chọn [1-6]:${NC} ")" choice
 
     case "$choice" in
         1)
@@ -232,6 +249,9 @@ main() {
             enable_services
             ;;
         5)
+            cleanup_system
+            ;;
+        6)
             info "Thoát."
             exit 0
             ;;

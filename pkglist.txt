@@ -104,6 +104,7 @@ man-pages
 sudo
 wget
 curl
+zip
 unzip
 p7zip
 htop
