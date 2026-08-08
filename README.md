@@ -2,64 +2,75 @@
 
 # 🏗️ Arch Linux Dotfiles
 
-**Cấu hình cá nhân cho Arch Linux + Hyprland**
+**Personal override layer for Arch Linux + JaKooLit Hyprland ecosystem**
 
 ![Arch Linux](https://img.shields.io/badge/Arch_Linux-1793D1?style=for-the-badge&logo=arch-linux&logoColor=white)
 ![Hyprland](https://img.shields.io/badge/Hyprland-58E1FF?style=for-the-badge&logo=hyprland&logoColor=black)
-![Wayland](https://img.shields.io/badge/Wayland-FFBC00?style=for-the-badge&logo=wayland&logoColor=black)
+![Neovim](https://img.shields.io/badge/Neovim-57A143?style=for-the-badge&logo=neovim&logoColor=white)
+![Zsh](https://img.shields.io/badge/Zsh-F15A24?style=for-the-badge&logo=zsh&logoColor=white)
+![Fcitx5](https://img.shields.io/badge/Fcitx5_🇻🇳_Bamboo-4EAA25?style=for-the-badge)
 
 </div>
 
 ---
 
-## 📐 Triết lý kiến trúc (Architecture Philosophy)
+## 📐 Architecture Philosophy
 
-Repo này **không** lưu trữ toàn bộ cấu hình Hyprland. Thay vào đó, nó hoạt động như một lớp **override** (ghi đè) cá nhân chồng lên cấu hình upstream của [JaKooLit](https://github.com/JaKooLit/Arch-Hyprland).
+This repo does **not** track the entire Hyprland configuration. Instead, it acts as a
+**personal override layer** that sits on top of
+[JaKooLit's upstream Hyprland dotfiles](https://github.com/JaKooLit/Arch-Hyprland).
 
 ```
-[JaKooLit Upstream]  +  [Repo này - UserConfigs Override]
-        ↓                            ↓
-   Core config            Cài đặt phần cứng & cá nhân
-   (không track)          (eDP-1 scale, fcitx5, EN vars)
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 1: JaKooLit Upstream (NOT tracked here)                  │
+│  └─ Core Hyprland config, Waybar, themes, scripts, animations   │
+├─────────────────────────────────────────────────────────────────┤
+│  Layer 2: This Repo — Personal Overrides                        │
+│  ├─ hypr/   → UserConfigs/ only (hardware + input method)       │
+│  ├─ zsh/    → .zshrc with Oh-My-Zsh + all personal aliases      │
+│  └─ nvim/   → Full LazyVim config (independent of WM)           │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-**Ưu điểm:**
-- ✅ Luôn nhận được bản cập nhật và sửa lỗi từ upstream JaKooLit
-- ✅ Cấu hình cá nhân được version control riêng, nhỏ gọn
-- ✅ Dễ tái cài đặt: chạy script upstream → áp dụng override này
+**Why this approach:**
+- ✅ Always receive upstream bug fixes and theme updates from JaKooLit
+- ✅ Personal configs are version-controlled separately, small and focused
+- ✅ Clean reinstall: run upstream script → apply this overlay → done
 
 ---
 
-## 📋 Mục lục
+## 📋 Contents
 
-- [Thông tin hệ thống](#-thông-tin-hệ-thống)
-- [Workflow cài đặt lại hệ thống](#-workflow-cài-đặt-lại-hệ-thống)
-- [Cấu trúc thư mục](#-cấu-trúc-thư-mục)
-- [Chi tiết các UserConfigs Override](#-chi-tiết-các-userconfigs-override)
+- [System Summary](#-system-summary)
+- [3-Step Reinstall Workflow](#-3-step-reinstall-workflow)
+- [Repository Structure](#-repository-structure)
+- [Hyprland UserConfigs — Key Overrides](#-hyprland-userconfigs--key-overrides)
 - [Keybindings](#-keybindings)
 
 ---
 
-## 💻 Thông tin hệ thống
+## 💻 System Summary
 
-| Thành phần | Lựa chọn |
+| Component | Choice |
 |---|---|
 | **Distro** | Arch Linux (rolling release) |
-| **Window Manager** | Hyprland (JaKooLit ecosystem) |
+| **Window Manager** | Hyprland via [JaKooLit/Arch-Hyprland](https://github.com/JaKooLit/Arch-Hyprland) |
 | **Terminal** | Kitty |
-| **Shell** | Bash |
-| **Status Bar** | Waybar |
-| **Input Method** | Fcitx5 + Bamboo (Tiếng Việt) |
+| **Shell** | Zsh + Oh-My-Zsh (theme: agnosterzak) |
+| **Editor** | Neovim (LazyVim distribution) |
+| **Status Bar** | Waybar (managed by JaKooLit upstream) |
+| **Input Method** | Fcitx5 + Bamboo (Vietnamese — Tiếng Việt) |
 | **Audio** | PipeWire |
 | **Dotfiles Manager** | GNU Stow |
 
 ---
 
-## 🚀 Workflow cài đặt lại hệ thống
+## 🚀 3-Step Reinstall Workflow
 
-### Bước 1: Cài đặt JaKooLit Hyprland (Upstream)
+### Step 1 — Run JaKooLit Upstream Install
 
-> Đây là nguồn gốc của toàn bộ cấu hình Hyprland core. **Chạy script này trước.**
+> ⚠️ **Do this first.** This creates the full Hyprland environment including
+> core configs, Waybar, themes, and all dependencies.
 
 ```bash
 git clone --depth=1 https://github.com/JaKooLit/Arch-Hyprland.git ~/JaKooLit-Arch
@@ -68,166 +79,160 @@ chmod +x install.sh
 ./install.sh
 ```
 
-Script sẽ tự động cài đặt Hyprland, waybar, và tất cả các phụ thuộc cần thiết,
-đồng thời tạo ra các file cấu hình mặc định trong `~/.config/hypr/`.
+This populates `~/.config/hypr/` with the upstream default configs.
+Log in to Hyprland at least once to verify it works before proceeding.
 
 ---
 
-### Bước 2: Sửa lỗi Deprecated Dispatchers (nếu cần)
+### Step 2 — Patch Deprecated Dispatchers (if needed)
 
-> ⚠️ Nếu Hyprland phiên bản mới báo lỗi về các dispatcher/keyword đã deprecated
-> từ upstream JaKooLit (ví dụ `togglesplit`, `pseudotile`, `vfr`),
-> hãy chạy các lệnh sau để comment chúng ra tạm thời:
+> ℹ️ Only required if Hyprland throws deprecation warnings about `togglesplit`,
+> `pseudotile`, or `vfr`. Check [JaKooLit's issue tracker](https://github.com/JaKooLit/Arch-Hyprland/issues)
+> to see if the upstream has been updated first.
 
 ```bash
-# Comment out 'togglesplit' dispatcher (deprecated → use layoutmsg)
+# Comment out deprecated keybind dispatchers
 sed -i '/togglesplit/s/^/#/' ~/.config/hypr/UserConfigs/UserKeybinds.conf
+sed -i '/pseudotile/s/^/#/'  ~/.config/hypr/UserConfigs/UserKeybinds.conf
 
-# Comment out 'pseudotile' dispatcher (deprecated → use layoutmsg)
-sed -i '/pseudotile/s/^/#/' ~/.config/hypr/UserConfigs/UserKeybinds.conf
-
-# Comment out 'vfr' misc option (deprecated)
+# Comment out deprecated misc option
 sed -i '/^\s*vfr\s*=/s/^/#/' ~/.config/hypr/hyprland.conf
 ```
 
-> 💡 Kiểm tra upstream đã cập nhật chưa trước khi áp dụng:
-> [JaKooLit Issues](https://github.com/JaKooLit/Arch-Hyprland/issues)
-
 ---
 
-### Bước 3: Áp dụng Personal Override (Repo này)
-
-Clone repo này và dùng GNU Stow để symlink phần `UserConfigs` override vào đúng vị trí:
+### Step 3 — Apply Personal Override (This Repo)
 
 ```bash
-# Clone repo cá nhân
+# Clone this repo
 git clone https://github.com/nnta301/dotfiles.git ~/dotfiles
 cd ~/dotfiles
 
-# Xóa UserConfigs mặc định từ upstream (sẽ được thay bằng symlink)
+# Run the setup script (handles stowing + JaKooLit compatibility)
+chmod +x setup.sh
+./setup.sh
+
+# — OR — apply manually with stow:
+# Remove upstream's default UserConfigs so our symlink can take its place
 rm -rf ~/.config/hypr/UserConfigs
-
-# Áp dụng Hyprland UserConfigs override qua stow
-stow hypr
-
-# Áp dụng các config khác
-stow bash
-stow waybar
+stow hypr      # → ~/.config/hypr/UserConfigs/ (our overrides)
+stow zsh       # → ~/.zshrc
+stow nvim      # → ~/.config/nvim/
 ```
 
-Sau khi stow, cấu trúc symlink sẽ là:
-
-```
-~/.config/hypr/UserConfigs/ → ~/dotfiles/hypr/.config/hypr/UserConfigs/
-~/.config/waybar/            → ~/dotfiles/waybar/.config/waybar/
-~/.bashrc                    → ~/dotfiles/bash/.bashrc
-```
-
-> Khởi động lại Hyprland để áp dụng tất cả thay đổi: `SUPER + M` → đăng nhập lại.
+After stowing, log out and back in (or restart Hyprland with `SUPER + M`).
 
 ---
 
-## 📁 Cấu trúc thư mục
+## 📁 Repository Structure
 
 ```
 dotfiles/
-├── 📄 .gitignore
-├── 📄 README.md              ← File này
-├── 📄 pkglist.txt            ← Danh sách packages
-├── 📄 setup.sh               ← Script tự động cài đặt (tùy chọn)
+├── 📄 .gitignore                  ← Excludes secrets, caches, nvim lock file
+├── 📄 README.md                   ← This file
+├── 📄 pkglist.txt                 ← Package list for reference
+├── 📄 setup.sh                    ← One-shot setup script
 │
-├── 📂 bash/                  ← Stow package: Bash
-│   ├── .bashrc
-│   └── .bash_profile
+├── 📂 hypr/                       ← Stow package: Hyprland UserConfigs ONLY
+│   └── .config/hypr/
+│       └── UserConfigs/           ← Replaces upstream's defaults
+│           ├── LaptopDisplay.conf     ← eDP-1 scale 1 (hardware fix)
+│           ├── Startup_Apps.conf      ← exec-once = fcitx5 -d
+│           ├── ENVariables.conf       ← Fcitx5 env vars (Qt + X11)
+│           ├── UserKeybinds.conf      ← Personal keybindings
+│           ├── UserSettings.conf      ← Personal Hyprland settings
+│           ├── UserAnimations.conf    ← Animation preferences
+│           ├── UserDecorations.conf   ← Decoration preferences
+│           ├── WindowRules.conf       ← Window rules
+│           ├── WorkSpaceRules.conf    ← Workspace rules
+│           └── Laptops.conf           ← Lid-close behaviour
 │
-├── 📂 hypr/                  ← Stow package: Hyprland OVERRIDE
-│   └── .config/
-│       └── hypr/
-│           └── UserConfigs/  ← CHỈ track folder này (không track core!)
-│               ├── LaptopDisplay.conf    ← Monitor eDP-1 scale fix
-│               ├── Startup_Apps.conf     ← exec-once = fcitx5 -d
-│               ├── ENVariables.conf      ← QT_IM_MODULE, XMODIFIERS
-│               ├── 01-UserDefaults.conf
-│               ├── UserKeybinds.conf
-│               ├── UserSettings.conf
-│               ├── UserAnimations.conf
-│               ├── UserDecorations.conf
-│               ├── WindowRules.conf
-│               ├── WorkSpaceRules.conf
-│               └── Laptops.conf
+├── 📂 zsh/                        ← Stow package: Shell (primary)
+│   └── .zshrc                     ← Oh-My-Zsh + lsd + fzf + app aliases
 │
-└── 📂 waybar/                ← Stow package: Waybar
-    └── .config/
-        └── waybar/
-            ├── config.jsonc
-            └── style.css
+├── 📂 nvim/                       ← Stow package: Neovim (LazyVim)
+│   └── .config/nvim/
+│       ├── init.lua
+│       ├── lazyvim.json
+│       ├── stylua.toml
+│       └── lua/
+│           ├── config/            ← autocmds, keymaps, lazy, options
+│           └── plugins/           ← custom plugin specs
+│
+└── 📂 scripts/                    ← Utility scripts
+    └── cleanup.sh                 ← Pacman cache + orphan + journal cleanup
 ```
+
+> 💡 `lazy-lock.json` is excluded from tracking by `.gitignore` to avoid
+> noisy diffs on every `:Lazy update`. Add it back intentionally if you want
+> pinned exact plugin versions.
 
 ---
 
-## 🔧 Chi tiết các UserConfigs Override
+## 🔧 Hyprland UserConfigs — Key Overrides
 
-### `LaptopDisplay.conf` — Cấu hình màn hình laptop
+### `LaptopDisplay.conf` — Monitor Scale
 
 ```conf
+# Disables upstream's 1.5× HiDPI scale for eDP-1
 monitor = eDP-1, preferred, auto, 1
 ```
 
-Thiết lập scale `1` (100%) cho màn hình nội bộ `eDP-1`. Scale mặc định của JaKooLit
-có thể là `1.5` hoặc `2` tuỳ thiết bị.
+This overrides JaKooLit's default which may set a fractional scale. `1` = 100%,
+correct for this display without blurry XWayland apps.
 
 ---
 
-### `Startup_Apps.conf` — Khởi động ứng dụng
+### `Startup_Apps.conf` — Fcitx5 Autostart
 
 ```conf
 exec-once = fcitx5 -d
 ```
 
-Tự động khởi động Fcitx5 ở chế độ daemon khi Hyprland bắt đầu. Cần thiết để nhập
-liệu tiếng Việt bằng bộ gõ Bamboo.
+Launches the Fcitx5 daemon in the background on Hyprland startup, required for
+Vietnamese input (Bamboo engine) to work across all applications.
 
 ---
 
-### `ENVariables.conf` — Biến môi trường Input Method
-
-Các biến được thêm vào để Fcitx5 hoạt động đúng với các ứng dụng Qt/X11:
+### `ENVariables.conf` — Input Method Environment
 
 ```conf
 env = QT_IM_MODULE, fcitx
 env = XMODIFIERS, @im=fcitx
 ```
 
-> ⚠️ **Lưu ý:** `GTK_IM_MODULE` **không** được set ở đây.
-> Kể từ GTK4, biến này không còn hoạt động đúng và có thể gây conflict.
-> Fcitx5 với GTK4 sử dụng D-Bus activation, không cần biến này.
+> ⚠️ **`GTK_IM_MODULE` is intentionally absent.** GTK4 dropped support for
+> `GTK_IM_MODULE` — setting it causes regressions in GTK4 apps. Fcitx5 handles
+> GTK4 integration automatically via its D-Bus portal.
 
 ---
 
 ## ⌨️ Keybindings
 
-| Phím tắt | Hành động |
+> These are set in `UserConfigs/UserKeybinds.conf` and may differ from JaKooLit defaults.
+
+| Shortcut | Action |
 |---|---|
-| `SUPER + Q` | Mở terminal (Kitty) |
-| `SUPER + C` | Đóng cửa sổ |
-| `SUPER + E` | Mở file manager |
-| `SUPER + R` | Mở app launcher |
+| `SUPER + Q` | Open terminal (Kitty) |
+| `SUPER + C` | Close window |
+| `SUPER + E` | Open file manager |
+| `SUPER + R` | Open app launcher |
 | `SUPER + V` | Toggle floating |
-| `SUPER + M` | Thoát Hyprland |
-| `SUPER + [1-0]` | Chuyển workspace 1-10 |
-| `SUPER + SHIFT + [1-0]` | Di chuyển cửa sổ sang workspace |
-| `SUPER + Arrow Keys` | Di chuyển focus |
-| `SUPER + SHIFT + Arrow Keys` | Di chuyển cửa sổ |
-| `Print` | Screenshot toàn màn hình |
-| `SUPER + SHIFT + S` | Screenshot vùng chọn |
-| `XF86Audio*` | Điều chỉnh âm lượng |
-| `XF86MonBrightness*` | Điều chỉnh độ sáng |
+| `SUPER + M` | Exit Hyprland |
+| `SUPER + [1–0]` | Switch workspace |
+| `SUPER + SHIFT + [1–0]` | Move window to workspace |
+| `SUPER + Arrow Keys` | Move focus |
+| `SUPER + SHIFT + Arrow Keys` | Move window |
+| `Print` | Full screenshot |
+| `SUPER + SHIFT + S` | Region screenshot |
+| `XF86Audio*` | Volume control |
+| `XF86MonBrightness*` | Brightness control |
 
 ---
 
 ## 📜 License
 
-Cấu hình cá nhân, tự do sử dụng và chỉnh sửa.
+Personal configuration — free to use and adapt.
 
 ---
 

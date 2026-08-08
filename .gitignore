@@ -56,3 +56,10 @@ hyprland.lock
 *.o
 *.so
 *.a
+
+# ── Neovim ───────────────────────────────────────────────────────
+# lazy-lock.json changes every ':Lazy update' — too noisy for daily diffs.
+# Track it intentionally only when you want to pin exact plugin versions.
+nvim/.config/nvim/lazy-lock.json
+# .neoconf.json is project-local LSP config, not global
+nvim/.config/nvim/.neoconf.json

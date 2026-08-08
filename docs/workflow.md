@@ -1,14 +1,15 @@
 # ⚙️ Workflow & Quy Trình Làm Việc
 
-Ghi chú cá nhân về quy trình làm việc hàng ngày, phím tắt Hyprland, và cách sync dotfiles.
+Ghi chú cá nhân về quy trình làm việc hàng ngày và cách sync dotfiles.
 
 ---
 
 ## 🔄 Quy trình sync Dotfiles
 
 ### Khi thay đổi config trên máy hiện tại
+
 ```bash
-cd ~/OneDrive/Documents/dotfiles
+cd ~/dotfiles
 
 # Xem những gì đã thay đổi
 git status
@@ -21,14 +22,22 @@ git push
 ```
 
 ### Khi cài lên máy mới
+
+> Xem [README.md](../README.md) để biết quy trình 3 bước đầy đủ.
+
 ```bash
-git clone <repo-url> ~/OneDrive/Documents/dotfiles
-cd ~/OneDrive/Documents/dotfiles
-chmod +x setup.sh
-./setup.sh
+# 1. Chạy JaKooLit upstream trước
+git clone --depth=1 https://github.com/JaKooLit/Arch-Hyprland.git ~/JaKooLit-Arch
+cd ~/JaKooLit-Arch && ./install.sh
+
+# 2. Clone repo cá nhân và áp dụng override
+git clone https://github.com/nnta301/dotfiles.git ~/dotfiles
+cd ~/dotfiles
+chmod +x setup.sh && ./setup.sh
 ```
 
 ### Cập nhật pkglist.txt từ hệ thống hiện tại
+
 ```bash
 # Export danh sách package đang cài (bỏ qua AUR)
 pacman -Qqen > pkglist.txt
@@ -42,41 +51,19 @@ pacman -Qqm >> pkglist.txt
 ## ⌨️ Phím tắt Hyprland (thường dùng)
 
 | Phím tắt | Hành động |
-|----------|-----------|
-| `Super + Enter` | Mở terminal |
-| `Super + Q` | Đóng cửa sổ hiện tại |
-| `Super + D` | Mở rofi launcher |
-| `Super + F` | Toggle fullscreen |
-| `Super + V` | Toggle floating |
-| `Super + 1~9` | Chuyển workspace |
-| `Super + Shift + 1~9` | Di chuyển cửa sổ sang workspace |
-| `Super + H/J/K/L` | Di chuyển focus (vim-style) |
-| `Super + R` | Resize mode |
-| `Super + Shift + E` | Thoát Hyprland |
-| `Super + L` | Khóa màn hình |
+|----------|-----------| 
+| `SUPER + Q` | Mở terminal (Kitty) |
+| `SUPER + C` | Đóng cửa sổ hiện tại |
+| `SUPER + R` | Mở app launcher |
+| `SUPER + E` | Mở file manager |
+| `SUPER + F` | Toggle fullscreen |
+| `SUPER + V` | Toggle floating |
+| `SUPER + 1~0` | Chuyển workspace |
+| `SUPER + Shift + 1~0` | Di chuyển cửa sổ sang workspace |
+| `SUPER + Arrow Keys` | Di chuyển focus |
+| `SUPER + M` | Thoát Hyprland |
 | `Print` | Chụp toàn màn hình |
-| `Super + Print` | Chụp vùng chọn |
-
----
-
-## 🖥️ Quy trình làm việc hàng ngày
-
-```
-Sáng:
-  1. Mở terminal → kiểm tra update: sudo pacman -Syu
-  2. Mở editor (Cursor/VSCode)
-  3. Pull latest code: git pull
-
-Khi cài thêm package:
-  1. Cài: sudo pacman -S <pkg> hoặc yay -S <pkg>
-  2. Cập nhật pkglist.txt
-  3. Commit lên dotfiles repo
-
-Cuối tuần:
-  1. Chạy cleanup: ./setup.sh → chọn 5 (Dọn dẹp hệ thống)
-  2. Kiểm tra dung lượng: df -h
-  3. Backup snapshot nếu cần
-```
+| `SUPER + Shift + S` | Chụp vùng chọn |
 
 ---
 
@@ -103,27 +90,27 @@ hyprctl reload
 
 # Xem log Hyprland
 journalctl --user -u hyprland -f
+
+# Neovim — cập nhật plugins
+nvim --headless "+Lazy! sync" +qa
 ```
 
 ---
 
-## 📁 Cấu trúc Dotfiles
+## 📁 Cấu trúc Dotfiles (hiện tại)
 
 ```
 dotfiles/
-├── bash/           → .bashrc, .bash_profile, aliases
-├── hypr/           → hyprland.conf, animations, keybinds
-├── waybar/         → config, style.css
-├── scripts/        → cleanup.sh và các script tiện ích khác
+├── hypr/           → UserConfigs/ override chồng lên JaKooLit upstream
+├── zsh/            → .zshrc (Oh-My-Zsh + aliases)
+├── nvim/           → .config/nvim/ (LazyVim)
+├── scripts/        → cleanup.sh và các script tiện ích
 ├── docs/           → Tài liệu này
-│   ├── manual-steps.md
-│   ├── troubleshooting.md
-│   └── workflow.md
-├── pkglist.txt     → Danh sách packages cần cài
-├── README.md
-└── setup.sh        → Script setup tự động
+├── pkglist.txt     → Danh sách packages tham khảo
+├── README.md       → Hướng dẫn cài đặt chính
+└── setup.sh        → Script stow tự động
 ```
 
 ---
 
-*Cập nhật lần cuối: 2026-08-01*
+*Cập nhật lần cuối: 2026-08-09*

@@ -41,11 +41,37 @@ newgrp docker
 
 ---
 
-## 3. Cài đặt font
+## 3. Cài đặt Oh-My-Zsh
+
+Oh-My-Zsh không cài qua pacman; cần cài thủ công trước khi stow zsh/:
 
 ```bash
-# Cài Nerd Fonts (ví dụ: JetBrainsMono)
-yay -S ttf-jetbrains-mono-nerd
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+```
+
+Sau đó cài plugins:
+```bash
+# zsh-autosuggestions
+git clone https://github.com/zsh-users/zsh-autosuggestions \
+    ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
+
+# zsh-syntax-highlighting
+git clone https://github.com/zsh-users/zsh-syntax-highlighting \
+    ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
+
+# agnosterzak theme
+git clone https://github.com/zakaziko99/agnosterzak-ohmyzsh-theme \
+    ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/themes/agnosterzak
+# Sau đó copy file theme vào thư mục themes
+```
+
+---
+
+## 4. Cài đặt font
+
+```bash
+# Nerd Fonts (đã có trong pkglist.txt)
+yay -S ttf-jetbrains-mono-nerd ttf-firacode-nerd
 
 # Refresh font cache
 fc-cache -fv
@@ -53,7 +79,36 @@ fc-cache -fv
 
 ---
 
-## 4. Thiết lập Bluetooth
+## 5. Thiết lập màn hình (đã được xử lý bởi override)
+
+`LaptopDisplay.conf` trong repo đã thiết lập:
+```conf
+monitor = eDP-1, preferred, auto, 1
+```
+
+Nếu bạn có thêm màn hình ngoài, thêm dòng tương ứng vào `LaptopDisplay.conf`:
+```conf
+monitor = HDMI-A-1, preferred, auto, 1
+```
+
+---
+
+## 6. Thiết lập Fcitx5 Bamboo (Vietnamese Input)
+
+Sau khi stow và khởi động lại Hyprland:
+
+```bash
+# Mở Fcitx5 Configuration GUI
+fcitx5-configtool
+```
+
+1. Thêm "Bamboo" vào Input Method
+2. Đặt Bamboo làm input method thứ 2 (sau "Keyboard - English")
+3. Kiểm tra hoạt động: mở bất kỳ app nào, nhấn `SUPER + SPACE` để chuyển input
+
+---
+
+## 7. Thiết lập Bluetooth
 
 ```bash
 bluetoothctl
@@ -67,16 +122,7 @@ bluetoothctl
 
 ---
 
-## 5. Thiết lập màn hình & tỷ lệ scale (HiDPI)
-
-Chỉnh trong `~/.config/hypr/hyprland.conf`:
-```
-monitor=,preferred,auto,1.5   # scale 1.5x cho màn HiDPI
-```
-
----
-
-## 6. Cài extension cho trình duyệt (thủ công)
+## 8. Cài extension cho trình duyệt (thủ công)
 
 Những extension **không thể sync tự động**:
 - [uBlock Origin](https://ublockorigin.com/)
@@ -85,13 +131,21 @@ Những extension **không thể sync tự động**:
 
 ---
 
-## 7. Thiết lập VSCode / Cursor
+## 9. Neovim — First Launch
+
+Lần đầu mở Neovim sau khi stow:
 
 ```bash
-# Đăng nhập Settings Sync
-# File → Preferences → Settings Sync → Sign in
+nvim
+# LazyVim sẽ tự động cài plugins lần đầu
+# Chờ khoảng 1-2 phút cho đến khi hoàn tất
+```
+
+Cài LSP servers qua Mason:
+```
+:Mason   → tìm và cài các server cần thiết
 ```
 
 ---
 
-*Cập nhật lần cuối: 2026-08-01*
+*Cập nhật lần cuối: 2026-08-09*

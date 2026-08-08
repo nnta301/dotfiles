@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════╗
-# ║                    Arch Linux Dotfiles Setup                     ║
+# ║              Personal Dotfiles — Override Layer Setup            ║
 # ║                                                                  ║
-# ║  Script tự động cài đặt packages và link config bằng GNU Stow   ║
+# ║  This script applies ONLY the personal override layer.           ║
+# ║  It assumes JaKooLit's upstream script has already been run.     ║
+# ║                                                                  ║
 # ║  Usage: chmod +x setup.sh && ./setup.sh                         ║
 # ╚══════════════════════════════════════════════════════════════════╝
 
@@ -15,155 +17,66 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 BOLD='\033[1m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# ── Helper Functions ─────────────────────────────────────────────
+# ── Helpers ──────────────────────────────────────────────────────
 info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
 success() { echo -e "${GREEN}[✓]${NC} $1"; }
 warn()    { echo -e "${YELLOW}[!]${NC} $1"; }
 error()   { echo -e "${RED}[✗]${NC} $1"; }
+header()  { echo -e "\n${CYAN}${BOLD}━━━ $1 ━━━${NC}"; }
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PKGLIST="$DOTFILES_DIR/pkglist.txt"
 
-# ── Stow packages (tên thư mục con trong dotfiles) ──────────────
-STOW_PACKAGES=(bash hypr waybar)
+# Stow packages managed by this repo (personal override layer only)
+# NOTE: 'hypr' only contains UserConfigs/ — JaKooLit manages the core config.
+STOW_PACKAGES=(zsh nvim hypr)
 
 # ═══════════════════════════════════════════════════════════════════
-#  Bước 1: Kiểm tra hệ thống
+#  Preflight checks
 # ═══════════════════════════════════════════════════════════════════
-check_system() {
-    echo ""
-    echo -e "${CYAN}${BOLD}══════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}${BOLD}   🏗️  Arch Linux Dotfiles Setup Script${NC}"
-    echo -e "${CYAN}${BOLD}══════════════════════════════════════════════${NC}"
-    echo ""
+preflight_checks() {
+    header "Preflight Checks"
 
-    # Kiểm tra Arch Linux
+    # Arch Linux
     if ! command -v pacman &>/dev/null; then
         error "Script này chỉ hỗ trợ Arch Linux (pacman không tìm thấy)"
         exit 1
     fi
-    success "Đang chạy trên Arch Linux"
+    success "Arch Linux detected"
 
-    # Kiểm tra quyền sudo
-    if ! sudo -v &>/dev/null; then
-        error "Cần quyền sudo để cài đặt packages"
-        exit 1
-    fi
-    success "Quyền sudo OK"
-}
-
-# ═══════════════════════════════════════════════════════════════════
-#  Bước 2: Cập nhật hệ thống
-# ═══════════════════════════════════════════════════════════════════
-update_system() {
-    info "Cập nhật hệ thống..."
-    sudo pacman -Syu --noconfirm
-    success "Hệ thống đã được cập nhật"
-}
-
-# ═══════════════════════════════════════════════════════════════════
-#  Bước 3: Cài đặt packages từ pkglist.txt
-# ═══════════════════════════════════════════════════════════════════
-install_packages() {
-    if [[ ! -f "$PKGLIST" ]]; then
-        error "Không tìm thấy $PKGLIST"
-        exit 1
-    fi
-
-    info "Cài đặt packages từ pkglist.txt..."
-
-    # Lọc bỏ comment, dòng trống, và ghi chú AUR
-    local official_pkgs
-    official_pkgs=$(grep -v '^\s*#\|^\s*$' "$PKGLIST" | grep -v '# AUR' | sed 's/\s*#.*//' | tr '\n' ' ')
-
-    local aur_pkgs
-    aur_pkgs=$(grep '# AUR' "$PKGLIST" | sed 's/\s*#.*//' | tr '\n' ' ')
-
-    # Cài packages từ official repo
-    if [[ -n "$official_pkgs" ]]; then
-        info "Cài đặt packages từ official repo..."
-        # shellcheck disable=SC2086
-        sudo pacman -S --needed --noconfirm $official_pkgs
-        success "Đã cài đặt official packages"
-    fi
-
-    # Cài packages từ AUR
-    if [[ -n "$aur_pkgs" ]]; then
-        if command -v yay &>/dev/null; then
-            info "Cài đặt AUR packages bằng yay..."
-            # shellcheck disable=SC2086
-            yay -S --needed --noconfirm $aur_pkgs
-            success "Đã cài đặt AUR packages"
-        else
-            warn "yay chưa được cài đặt. Bỏ qua AUR packages: $aur_pkgs"
-            warn "Cài yay: git clone https://aur.archlinux.org/yay.git /tmp/yay && cd /tmp/yay && makepkg -si"
-        fi
-    fi
-}
-
-# ═══════════════════════════════════════════════════════════════════
-#  Bước 4: Cài đặt yay (AUR helper)
-# ═══════════════════════════════════════════════════════════════════
-install_yay() {
-    if command -v yay &>/dev/null; then
-        success "yay đã được cài đặt"
-        return
-    fi
-
-    info "Cài đặt yay (AUR helper)..."
-    local tmp_dir
-    tmp_dir=$(mktemp -d)
-    git clone https://aur.archlinux.org/yay.git "$tmp_dir/yay"
-    cd "$tmp_dir/yay" && makepkg -si --noconfirm
-    cd "$DOTFILES_DIR"
-    rm -rf "$tmp_dir"
-    success "Đã cài đặt yay"
-}
-
-# ═══════════════════════════════════════════════════════════════════
-#  Bước 5: Link config bằng GNU Stow
-# ═══════════════════════════════════════════════════════════════════
-stow_configs() {
-    # Kiểm tra stow đã cài chưa
+    # stow
     if ! command -v stow &>/dev/null; then
         info "Cài đặt GNU Stow..."
         sudo pacman -S --needed --noconfirm stow
     fi
+    success "GNU Stow available"
 
-    info "Linking config files bằng GNU Stow..."
-
-    for pkg in "${STOW_PACKAGES[@]}"; do
-        if [[ -d "$DOTFILES_DIR/$pkg" ]]; then
-            # Backup file gốc nếu tồn tại (không phải symlink)
-            backup_existing "$pkg"
-
-            info "  Stow: $pkg"
-            stow -d "$DOTFILES_DIR" -t "$HOME" -R "$pkg" 2>/dev/null || {
-                warn "  Không thể stow $pkg — có thể có xung đột file. Thử stow --adopt..."
-                stow -d "$DOTFILES_DIR" -t "$HOME" --adopt "$pkg"
-                # Restore từ git sau khi adopt
-                cd "$DOTFILES_DIR" && git checkout -- "$pkg/" 2>/dev/null || true
-            }
-            success "  Đã link: $pkg"
-        else
-            warn "  Bỏ qua $pkg (thư mục không tồn tại)"
-        fi
-    done
+    # Check JaKooLit upstream was run (look for its core config)
+    if [[ ! -f "$HOME/.config/hypr/hyprland.conf" ]]; then
+        warn "Không tìm thấy ~/.config/hypr/hyprland.conf"
+        warn "Hãy chạy JaKooLit upstream install script trước:"
+        warn "  git clone --depth=1 https://github.com/JaKooLit/Arch-Hyprland.git ~/JaKooLit-Arch"
+        warn "  cd ~/JaKooLit-Arch && ./install.sh"
+        echo ""
+        read -rp "$(echo -e "${YELLOW}Tiếp tục mà không có upstream? [y/N]:${NC} ")" cont
+        [[ "${cont,,}" == "y" ]] || { info "Thoát."; exit 0; }
+    else
+        success "JaKooLit upstream config found"
+    fi
 }
 
-# ── Backup file gốc trước khi stow ──────────────────────────────
+# ═══════════════════════════════════════════════════════════════════
+#  Backup existing real files before stowing
+# ═══════════════════════════════════════════════════════════════════
 backup_existing() {
     local pkg="$1"
     local backup_dir="$HOME/.dotfiles-backup/$(date +%Y%m%d_%H%M%S)"
 
-    # Tìm tất cả file trong stow package
     while IFS= read -r file; do
         local rel_path="${file#"$DOTFILES_DIR/$pkg/"}"
         local target="$HOME/$rel_path"
 
-        # Nếu file tồn tại và KHÔNG phải symlink → backup
         if [[ -f "$target" && ! -L "$target" ]]; then
             mkdir -p "$backup_dir/$(dirname "$rel_path")"
             cp "$target" "$backup_dir/$rel_path"
@@ -174,84 +87,129 @@ backup_existing() {
 }
 
 # ═══════════════════════════════════════════════════════════════════
-#  Bước 6: Bật services cần thiết
+#  Apply stow packages
 # ═══════════════════════════════════════════════════════════════════
-enable_services() {
-    info "Bật các services cần thiết..."
+stow_configs() {
+    header "Applying Stow Packages"
+    info "Packages: ${STOW_PACKAGES[*]}"
+    echo ""
 
-    # System services
-    local system_services=(NetworkManager bluetooth)
-    for svc in "${system_services[@]}"; do
-        if systemctl list-unit-files "${svc}.service" &>/dev/null; then
-            sudo systemctl enable --now "${svc}.service" 2>/dev/null || true
-            success "  Enabled: $svc"
+    for pkg in "${STOW_PACKAGES[@]}"; do
+        if [[ ! -d "$DOTFILES_DIR/$pkg" ]]; then
+            warn "  Bỏ qua '$pkg' (thư mục không tồn tại)"
+            continue
         fi
-    done
 
-    # User services (PipeWire)
-    local user_services=(pipewire pipewire-pulse wireplumber)
-    for svc in "${user_services[@]}"; do
-        systemctl --user enable --now "${svc}.service" 2>/dev/null || true
-        success "  Enabled (user): $svc"
+        # Special handling for hypr: only UserConfigs/ needs to replace upstream's copy
+        if [[ "$pkg" == "hypr" ]]; then
+            local uc_target="$HOME/.config/hypr/UserConfigs"
+            if [[ -d "$uc_target" && ! -L "$uc_target" ]]; then
+                warn "  Xóa UserConfigs upstream để thay bằng symlink..."
+                rm -rf "$uc_target"
+            fi
+        fi
+
+        backup_existing "$pkg"
+
+        info "  Stowing: $pkg"
+        stow -d "$DOTFILES_DIR" -t "$HOME" -R "$pkg" 2>/dev/null || {
+            warn "  Xung đột — thử stow --adopt..."
+            stow -d "$DOTFILES_DIR" -t "$HOME" --adopt "$pkg"
+            cd "$DOTFILES_DIR" && git checkout -- "$pkg/" 2>/dev/null || true
+        }
+        success "  Linked: $pkg"
     done
 }
 
 # ═══════════════════════════════════════════════════════════════════
-#  Bước 7: Dọn dẹp hệ thống
+#  Patch deprecated Hyprland dispatchers (upstream JaKooLit)
 # ═══════════════════════════════════════════════════════════════════
-cleanup_system() {
-    local cleanup_script="$DOTFILES_DIR/scripts/cleanup.sh"
+patch_deprecations() {
+    header "Patching Deprecated Hyprland Dispatchers"
+    warn "Kiểm tra upstream JaKooLit trước khi chạy bước này:"
+    warn "  https://github.com/JaKooLit/Arch-Hyprland/issues"
+    echo ""
+    read -rp "$(echo -e "${CYAN}Áp dụng patch deprecated dispatchers? [y/N]:${NC} ")" apply
 
-    if [[ ! -f "$cleanup_script" ]]; then
-        error "Không tìm thấy $cleanup_script"
-        exit 1
+    if [[ "${apply,,}" == "y" ]]; then
+        local keybinds="$HOME/.config/hypr/UserConfigs/UserKeybinds.conf"
+        local hyprconf="$HOME/.config/hypr/hyprland.conf"
+
+        if [[ -f "$keybinds" ]]; then
+            sed -i '/togglesplit/s/^/#/' "$keybinds" 2>/dev/null || true
+            sed -i '/pseudotile/s/^/#/' "$keybinds" 2>/dev/null || true
+            success "  Commented out togglesplit / pseudotile in UserKeybinds.conf"
+        fi
+        if [[ -f "$hyprconf" ]]; then
+            sed -i '/^\s*vfr\s*=/s/^/#/' "$hyprconf" 2>/dev/null || true
+            success "  Commented out vfr in hyprland.conf"
+        fi
+    else
+        info "  Bỏ qua patch."
+    fi
+}
+
+# ═══════════════════════════════════════════════════════════════════
+#  Install AUR packages not handled by JaKooLit
+# ═══════════════════════════════════════════════════════════════════
+install_extra_pkgs() {
+    header "Extra Packages (not in JaKooLit upstream)"
+
+    if ! command -v yay &>/dev/null; then
+        warn "yay chưa được cài. Bỏ qua AUR packages."
+        warn "Cài yay: https://github.com/Jguer/yay"
+        return
     fi
 
-    info "Chạy script dọn dẹp hệ thống..."
-    bash "$cleanup_script"
-    success "Dọn dẹp hoàn tất!"
+    info "Cài đặt packages cá nhân..."
+    yay -S --needed --noconfirm \
+        fcitx5 fcitx5-gtk fcitx5-qt fcitx5-configtool fcitx5-bamboo \
+        zsh zsh-completions zsh-autosuggestions zsh-syntax-highlighting \
+        lsd pokemon-colorscripts-git \
+        oh-my-zsh-git \
+        lazygit ripgrep fd fzf bat eza \
+        2>/dev/null || warn "Một số package có thể đã được cài hoặc không có trong AUR"
+    success "Extra packages done"
 }
 
 # ═══════════════════════════════════════════════════════════════════
 #  MAIN
 # ═══════════════════════════════════════════════════════════════════
 main() {
-    check_system
+    echo ""
+    echo -e "${CYAN}${BOLD}╔══════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}${BOLD}║    Personal Dotfiles — Override Layer        ║${NC}"
+    echo -e "${CYAN}${BOLD}║    (assumes JaKooLit upstream already run)   ║${NC}"
+    echo -e "${CYAN}${BOLD}╚══════════════════════════════════════════════╝${NC}"
+    echo ""
 
-    echo ""
     echo -e "${BOLD}Chọn hành động:${NC}"
-    echo "  1) Cài đặt đầy đủ (packages + stow + services)"
-    echo "  2) Chỉ cài packages"
-    echo "  3) Chỉ link config (stow)"
-    echo "  4) Chỉ bật services"
-    echo "  5) Dọn dẹp hệ thống"
-    echo "  6) Thoát"
+    echo "  1) Áp dụng tất cả (stow + patch + extra packages)"
+    echo "  2) Chỉ stow configs (zsh, nvim, hypr UserConfigs)"
+    echo "  3) Chỉ patch deprecated dispatchers"
+    echo "  4) Chỉ cài extra packages"
+    echo "  5) Thoát"
     echo ""
-    read -rp "$(echo -e "${CYAN}Lựa chọn [1-6]:${NC} ")" choice
+    read -rp "$(echo -e "${CYAN}Lựa chọn [1-5]:${NC} ")" choice
+
+    preflight_checks
 
     case "$choice" in
         1)
-            update_system
-            install_yay
-            install_packages
             stow_configs
-            enable_services
+            patch_deprecations
+            install_extra_pkgs
             ;;
         2)
-            update_system
-            install_yay
-            install_packages
-            ;;
-        3)
             stow_configs
             ;;
+        3)
+            patch_deprecations
+            ;;
         4)
-            enable_services
+            install_extra_pkgs
             ;;
         5)
-            cleanup_system
-            ;;
-        6)
             info "Thoát."
             exit 0
             ;;
@@ -262,12 +220,14 @@ main() {
     esac
 
     echo ""
-    echo -e "${GREEN}${BOLD}══════════════════════════════════════════════${NC}"
-    echo -e "${GREEN}${BOLD}   ✅ Hoàn tất! Khởi động lại để áp dụng.${NC}"
-    echo -e "${GREEN}${BOLD}══════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}${BOLD}╔══════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}${BOLD}║   ✅ Hoàn tất! Đăng xuất & đăng nhập lại.  ║${NC}"
+    echo -e "${GREEN}${BOLD}╚══════════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "  ${CYAN}Reboot:${NC} sudo reboot"
-    echo -e "  ${CYAN}Hoặc:${NC}  Hyprland (nếu đã cài) → đăng nhập lại"
+    echo -e "  Symlinks đã tạo:"
+    for pkg in "${STOW_PACKAGES[@]}"; do
+        echo -e "    ${CYAN}$pkg${NC} → $DOTFILES_DIR/$pkg"
+    done
     echo ""
 }
 

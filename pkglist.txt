@@ -42,7 +42,12 @@ qt6-wayland
 
 # ── Terminal & Shell ─────────────────────────────────────────────
 kitty
-bash-completion
+zsh
+zsh-completions
+zsh-autosuggestions          # AUR or extra repo
+zsh-syntax-highlighting      # AUR or extra repo
+lsd                          # ls replacement used in .zshrc
+pokemon-colorscripts-git     # AUR — startup splash in .zshrc
 
 # ── File Manager ─────────────────────────────────────────────────
 dolphin
