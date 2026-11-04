@@ -1,0 +1,3 @@
+com.github.rafostar.Clapper
+io.github.flattool.Warehouse
+io.github.spacingbat3.webcord

@@ -17,39 +17,40 @@ ssh-keygen -t ed25519 -C "email@example.com"
 cat ~/.ssh/id_ed25519.pub   # Copy và paste vào GitHub → Settings → SSH Keys
 ```
 
-### OneDrive (rclone)
+### OneDrive
+
+Máy cũ có `onedrive-abraunegg` và đã bật `onedrive.service` cho người dùng. Sau khi cài gói và đăng nhập lại bằng lệnh `onedrive`, bật lại dịch vụ nếu bạn muốn đồng bộ tự động:
+
+```bash
+systemctl --user enable --now onedrive.service
+```
+
+Máy cũng có `rclone`, nhưng chưa xác định được có dùng rclone để đồng bộ OneDrive hay không. Nếu bạn dùng rclone:
 ```bash
 rclone config   # Làm theo hướng dẫn, chọn "Microsoft OneDrive"
 # Sau đó mount:
 rclone mount OneDrive: ~/OneDrive --daemon
 ```
 
+Không đưa refresh token hoặc cấu hình xác thực lên Git. Xem `reinstall.md` để chuẩn bị bản sao dữ liệu trước khi cài lại.
+
 ---
 
 ## 2. Cấp quyền & nhóm người dùng
 
-```bash
-# Thêm user vào nhóm cần thiết
-sudo usermod -aG video,audio,input,seat $USER
-
-# Nếu dùng Docker
-sudo usermod -aG docker $USER
-
-# Áp dụng nhóm mới (cần logout hoặc:)
-newgrp docker
-```
+Xem [bước tạo tài khoản và các nhóm tùy chọn](cai-arch-tu-windows.md) trước khi thêm quyền. Nhóm `input` có thể đọc sự kiện bàn phím; nhóm `docker` cấp quyền tương đương root, nên chỉ thêm khi cần.
 
 ---
 
 ## 3. Cài đặt Oh-My-Zsh
 
-Oh-My-Zsh không cài qua pacman; cần cài thủ công trước khi stow zsh/:
+Mục 1 hoặc 4 trong `setup.sh` sẽ chuẩn bị Oh My Zsh, plugin và theme. Nếu làm thủ công, trước tiên kiểm tra `~/.oh-my-zsh`: installer JaKooLit có thể đã cài sẵn. Chỉ chạy trình cài chính thức sau nếu chưa có Oh My Zsh; trình cài có thể thay đổi `.zshrc`, nên sao lưu cấu hình hiện tại trước:
 
 ```bash
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 ```
 
-Sau đó cài plugins:
+Sau đó, chỉ clone plugin chưa có (lệnh sẽ lỗi nếu thư mục đích đã tồn tại):
 ```bash
 # zsh-autosuggestions
 git clone https://github.com/zsh-users/zsh-autosuggestions \
@@ -59,10 +60,11 @@ git clone https://github.com/zsh-users/zsh-autosuggestions \
 git clone https://github.com/zsh-users/zsh-syntax-highlighting \
     ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
 
-# agnosterzak theme
+# agnosterzak theme: clone rồi sao chép file theme theo hướng dẫn tác giả
+mkdir -p ~/.oh-my-zsh/custom/themes
 git clone https://github.com/zakaziko99/agnosterzak-ohmyzsh-theme \
-    ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/themes/agnosterzak
-# Sau đó copy file theme vào thư mục themes
+    ~/agnosterzak-ohmyzsh-theme
+cp ~/agnosterzak-ohmyzsh-theme/agnosterzak.zsh-theme ~/.oh-my-zsh/custom/themes/
 ```
 
 ---
@@ -70,8 +72,8 @@ git clone https://github.com/zakaziko99/agnosterzak-ohmyzsh-theme \
 ## 4. Cài đặt font
 
 ```bash
-# Nerd Fonts (đã có trong pkglist.txt)
-yay -S ttf-jetbrains-mono-nerd ttf-firacode-nerd
+# Ví dụ một Nerd Font từ repo chính thức
+sudo pacman -S --needed ttf-jetbrains-mono-nerd
 
 # Refresh font cache
 fc-cache -fv
@@ -86,10 +88,7 @@ fc-cache -fv
 monitor = eDP-1, preferred, auto, 1
 ```
 
-Nếu bạn có thêm màn hình ngoài, thêm dòng tương ứng vào `LaptopDisplay.conf`:
-```conf
-monitor = HDMI-A-1, preferred, auto, 1
-```
+Để chiếu giống laptop hoặc chỉ sử dụng màn hình ngoài, xem [hướng dẫn màn hình ngoài](man-hinh-ngoai.md). Tên cổng HDMI tùy thiết bị; kiểm tra bằng `hyprctl monitors`.
 
 ---
 

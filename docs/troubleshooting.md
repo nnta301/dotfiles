@@ -6,11 +6,8 @@ Ghi lại các lỗi từng gặp trên hệ thống Arch Linux và cách xử l
 
 ## 1. Lỗi Pacman: "Error reading fd 7" khi chạy cache clean
 
-- **Nguyên nhân:** File tải tạm thời bị kẹt trong session hiện tại.
-- **Cách xử lý:** Bỏ qua vì không ảnh hưởng đến hệ thống, hoặc xóa thủ công:
-  ```bash
-  sudo rm -rf /var/cache/pacman/pkg/*.part
-  ```
+- **Nguyên nhân có thể xảy ra:** Các thư mục tải tạm `download-*` còn sót trong cache bị Pacman đọc như package. Chúng khác với các file `.part`.
+- **Cách xử lý:** Chạy `./scripts/cleanup.sh --dry-run` để kiểm tra, sau đó chạy `./scripts/cleanup.sh`. Script chỉ xóa các thư mục `download-*` rỗng, cũ hơn 24 giờ và bỏ qua nếu phát hiện Pacman/Yay đang chạy hoặc có lock. Các thư mục còn dữ liệu được liệt kê để kiểm tra riêng. Không xóa lock hay file `.part` khi chưa xác định giao dịch đã kết thúc.
 
 ---
 
@@ -23,11 +20,7 @@ Ghi lại các lỗi từng gặp trên hệ thống Arch Linux và cách xử l
      ```bash
      journalctl -b -p err
      ```
-  3. Nếu lỗi do driver NVIDIA, thử cài `nvidia-dkms`:
-     ```bash
-     sudo pacman -S nvidia-dkms nvidia-utils
-     sudo mkinitcpio -P
-     ```
+  3. Xác định GPU và driver NVIDIA đang dùng trước khi thay đổi. Máy cũ dùng `nvidia-open`, trong khi một số lựa chọn JaKooLit cài `nvidia-dkms`; hai lựa chọn có thể xung đột. Kiểm tra tài liệu driver cho phần cứng và kernel của bạn, không tự thay driver chỉ vì màn hình đen.
 
 ---
 
@@ -37,7 +30,7 @@ Ghi lại các lỗi từng gặp trên hệ thống Arch Linux và cách xử l
 - **Nguyên nhân:** Keyring chưa được cập nhật.
 - **Cách xử lý:**
   ```bash
-  sudo pacman -Sy archlinux-keyring
+  sudo pacman -Syu archlinux-keyring
   sudo pacman-key --populate archlinux
   ```
 
@@ -47,11 +40,7 @@ Ghi lại các lỗi từng gặp trên hệ thống Arch Linux và cách xử l
 
 - **Triệu chứng:** `WARNING! stowing <pkg> would cause conflicts`
 - **Nguyên nhân:** File config gốc vẫn còn tồn tại (chưa được backup/xóa).
-- **Cách xử lý:** `setup.sh` đã tự động backup vào `~/.dotfiles-backup/`. Nếu vẫn lỗi:
-  ```bash
-  stow --adopt -d ~/dotfiles -t ~ <tên_package>
-  cd ~/dotfiles && git checkout -- <tên_package>/
-  ```
+- **Cách xử lý:** `setup.sh` chuyển file trùng và `UserConfigs` cũ vào `~/.dotfiles-backup.*`. Nếu vẫn lỗi, xem thông báo Stow và xử lý từng symlink hoặc thư mục xung đột; script không tự chạy `--adopt` hay `git checkout`.
 
 ---
 
@@ -92,12 +81,7 @@ Ghi lại các lỗi từng gặp trên hệ thống Arch Linux và cách xử l
 ## 7. Neovim — lazy-lock.json tạo diff mỗi lần cập nhật plugin
 
 - **Nguyên nhân:** `lazy-lock.json` lưu version hash của từng plugin, thay đổi mỗi lần `:Lazy update`.
-- **Cách xử lý:** File này đã được exclude trong `.gitignore`. Nếu muốn pin versions:
-  ```bash
-  # Bỏ ignore tạm thời để commit
-  git add -f nvim/.config/nvim/lazy-lock.json
-  git commit -m "chore(nvim): pin plugin versions YYYY-MM-DD"
-  ```
+- **Cách xử lý:** Repo lưu lockfile để khôi phục phiên bản plugin. Kiểm tra diff sau `:Lazy update` và commit nếu muốn giữ các phiên bản mới.
 
 ---
 

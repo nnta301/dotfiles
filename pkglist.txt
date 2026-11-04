@@ -1,116 +1,170 @@
-# ╔══════════════════════════════════════════════════════════════════╗
-# ║                    Package List - Arch Linux                    ║
-# ║          Danh sách gói cần thiết cho hệ thống Hyprland          ║
-# ║                                                                 ║
-# ║  Cài đặt: pacman -S --needed - < pkglist.txt                   ║
-# ║  Xuất danh sách hiện tại: pacman -Qqen > pkglist.txt            ║
-# ╚══════════════════════════════════════════════════════════════════╝
+# Các dòng không có # được setup.sh cài; tiền tố aur/ chọn nguồn AUR.
+# Xóa hoặc thêm # đầu dòng nếu không muốn cài gói đó.
+# Các mục Flatpak ở cuối chỉ để xem xét, chưa được tự động cài.
+# Firefox được giữ lại; Brave không nằm trong danh sách.
 
-# ── Base System ──────────────────────────────────────────────────
-base
+# Cấu hình shell, editor và bộ gõ
+stow
+git
 base-devel
-linux
-linux-headers
-linux-firmware
-
-# ── Bootloader ───────────────────────────────────────────────────
-grub
-efibootmgr
-os-prober
-
-# ── Network ──────────────────────────────────────────────────────
-networkmanager
-iwd
-bluez
-bluez-utils
-
-# ── NVIDIA Drivers ───────────────────────────────────────────────
-nvidia
-nvidia-utils
-nvidia-settings
-libva-nvidia-driver
-
-# ── Wayland / Hyprland ───────────────────────────────────────────
-hyprland
-xdg-desktop-portal-hyprland
-xdg-desktop-portal-gtk
-xdg-utils
-wayland
-wayland-protocols
-qt5-wayland
-qt6-wayland
-
-# ── Terminal & Shell ─────────────────────────────────────────────
-kitty
-zsh
-zsh-completions
-zsh-autosuggestions          # AUR or extra repo
-zsh-syntax-highlighting      # AUR or extra repo
-lsd                          # ls replacement used in .zshrc
-pokemon-colorscripts-git     # AUR — startup splash in .zshrc
-
-# ── File Manager ─────────────────────────────────────────────────
-dolphin
-thunar
-
-# ── Status Bar & Notifications ───────────────────────────────────
-waybar
-mako
-
-# ── App Launcher ─────────────────────────────────────────────────
-hyprlauncher
-
-# ── Authentication Agent ─────────────────────────────────────────
-polkit-gnome
-
-# ── Input Method (Tiếng Việt) ────────────────────────────────────
 fcitx5
 fcitx5-gtk
 fcitx5-qt
 fcitx5-configtool
-fcitx5-bamboo          # AUR
-
-# ── Screenshot & Clipboard ──────────────────────────────────────
-grim
-slurp
-swappy
-wl-clipboard
-
-# ── Media & Audio ────────────────────────────────────────────────
-pipewire
-pipewire-alsa
-pipewire-pulse
-pipewire-jack
-wireplumber
-playerctl
-brightnessctl
-
-# ── Fonts ────────────────────────────────────────────────────────
-ttf-jetbrains-mono-nerd
-ttf-firacode-nerd
-noto-fonts
-noto-fonts-cjk
-noto-fonts-emoji
-
-# ── Development Tools ────────────────────────────────────────────
-git
+fcitx5-bamboo
 neovim
+zsh
+lsd
+fzf
+fastfetch
+socat
 lazygit
 ripgrep
 fd
-fzf
 bat
 eza
-stow
 
-# ── System Utilities ────────────────────────────────────────────
-man-db
-man-pages
-sudo
-wget
-curl
-zip
-unzip
-p7zip
+# Ứng dụng đồ họa và giải trí
+discord
+dbeaver
+intellij-idea-community-edition
+libreoffice-fresh
+gimp
+gedit
+mousepad
+obs-studio
+vlc
+vlc-plugin-ffmpeg
+ark
+xarchiver
+dolphin
+thunar
+thunar-archive-plugin
+thunar-volman
+loupe
+qalculate-gtk
+gnome-system-monitor
+blueman
+
+# Công cụ phát triển và dữ liệu
+docker
+docker-compose
+jdk21-openjdk
+maven
+nodejs
+npm
+python-pip
+python-pyquery
+mariadb
+cmake
+extra-cmake-modules
+mercurial
+uv
+tectonic
+texlive-langother
+texlive-meta
+
+# Tiện ích thường dùng
+flatpak
+btop
 htop
-fastfetch
+ncdu
+inxi
+nvtop
+rsync
+rclone
+yt-dlp
+unzip
+zip
+wget
+vim
+tldr
+pacman-contrib
+plocate
+
+# Các gói hệ thống và ứng dụng còn lại đang có trên máy này.
+# Nhóm này bao gồm kernel, bootloader, Intel microcode và driver NVIDIA;
+# kiểm tra phần cứng và driver hiện có trước khi chạy trên máy khác.
+alsa-firmware
+alsa-utils
+arch-install-scripts
+awww
+base
+bash-completion
+cpupower
+dosfstools
+efibootmgr
+egl-wayland
+ffmpegthumbs
+firefox
+grub
+gst-plugin-pipewire
+gst-plugins-bad
+gst-plugins-good
+gst-plugins-ugly
+gumbo-parser
+hyprpicker
+intel-ucode
+iwd
+jbig2dec
+kde-cli-tools
+kvantum-qt5
+less
+libdvdcss
+libmupdf
+linux
+linux-firmware
+minizip
+networkmanager
+noto-fonts-cjk
+numlockx
+nvidia-open
+os-prober
+parallel
+pipewire-jack
+polkit-gnome
+qt5-graphicaleffects
+qt5-imageformats
+qt5-wayland
+qt6-wayland
+reflector
+sudo
+thermald
+ttf-cascadia-code-nerd
+ttf-dejavu
+ttf-liberation
+ttf-nerd-fonts-symbols
+udiskie
+ufw
+woff2-font-awesome
+wofi
+
+# AUR: setup.sh dùng yay, xây dựng với tài khoản thường.
+aur/google-chrome
+aur/antigravity-ide
+aur/auto-cpufreq
+aur/downgrade
+aur/envycontrol
+aur/grimblast-git
+aur/gtk-engine-murrine
+aur/hyde-cli-git
+aur/legacy-launcher
+aur/oh-my-zsh-git
+aur/onedrive-abraunegg
+aur/pokemon-colorscripts-git
+aur/postman-bin
+aur/powertop-git
+aur/python-pyamdgpuinfo
+aur/sddm-theme-catppuccin-git
+aur/swaylock-effects-git
+aur/teamviewer
+aur/ttf-victor-mono
+aur/visual-studio-code-bin
+aur/wlogout
+aur/yay
+aur/zsh-theme-powerlevel10k-git
+
+# Flatpak đã cài: chỉ tham khảo, setup.sh chưa cài.
+# com.github.rafostar.Clapper
+# io.github.flattool.Warehouse
+# io.github.spacingbat3.webcord

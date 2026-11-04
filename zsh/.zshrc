@@ -20,7 +20,9 @@ source $ZSH/oh-my-zsh.sh
 # Display Pokemon-colorscripts
 # Project page: https://gitlab.com/phoneybadger/pokemon-colorscripts#on-other-distros-and-macos
 #pokemon-colorscripts --no-title -s -r #without fastfetch
-pokemon-colorscripts --no-title -s -r | fastfetch -c $HOME/.config/fastfetch/config-pokemon.jsonc --logo-type file-raw --logo-height 10 --logo-width 5 --logo -
+if command -v pokemon-colorscripts >/dev/null && command -v fastfetch >/dev/null && [[ -f "$HOME/.config/fastfetch/config-pokemon.jsonc" ]]; then
+    pokemon-colorscripts --no-title -s -r | fastfetch -c "$HOME/.config/fastfetch/config-pokemon.jsonc" --logo-type file-raw --logo-height 10 --logo-width 5 --logo -
+fi
 
 # fastfetch. Will be disabled if above colorscript was chosen to install
 #fastfetch -c $HOME/.config/fastfetch/config-compact.jsonc
@@ -53,3 +55,4 @@ alias onedrive='(/usr/bin/google-chrome-stable --profile-directory=Default --app
 alias obs='(obs > /dev/null 2>&1 &)'
 alias dbeaver='(dbeaver > /dev/null 2>&1 &)'
 alias postman='(postman > /dev/null 2>&1 &)'
+alias minecraft='(legacy-launcher > /dev/null 2>&1 &)'

@@ -23,7 +23,7 @@ git push
 
 ### Khi cài lên máy mới
 
-> Xem [README.md](../README.md) để biết quy trình 3 bước đầy đủ.
+> Xem [README.md](../README.md) để biết quy trình cài đặt và liên kết hướng dẫn chi tiết.
 
 ```bash
 # 1. Chạy JaKooLit upstream trước
@@ -36,14 +36,13 @@ cd ~/dotfiles
 chmod +x setup.sh && ./setup.sh
 ```
 
-### Cập nhật pkglist.txt từ hệ thống hiện tại
+### Cập nhật snapshot package từ hệ thống hiện tại
 
 ```bash
-# Export danh sách package đang cài (bỏ qua AUR)
-pacman -Qqen > pkglist.txt
-
-# Kèm AUR packages
-pacman -Qqm >> pkglist.txt
+# Xuất riêng package được cài chủ động từ repo chính thức và gói ngoài
+pacman -Qqen > packages/explicit-repo.txt
+pacman -Qqem > packages/explicit-foreign.txt
+pacman -Qqm > packages/all-foreign.txt
 ```
 
 ---
@@ -68,6 +67,15 @@ pacman -Qqm >> pkglist.txt
 ---
 
 ## 🧰 Lệnh thường dùng
+
+Script dọn dung lượng có chế độ xem trước và sẽ hỏi trước khi xóa package mồ côi, cache build Yay hoặc thùng rác:
+
+```bash
+./scripts/cleanup.sh --dry-run
+./scripts/cleanup.sh
+```
+
+Script dùng `paccache` (package `pacman-contrib`) để giữ hai phiên bản package, dọn journal đã lưu trữ và các thư mục tải tạm Pacman rỗng, cũ. Thùng rác được xử lý ở thư mục dữ liệu người dùng; thùng rác trên ổ đĩa khác không được quét. Chế độ xem trước có thể cần `sudo` để đọc các thư mục cache thuộc người dùng khác.
 
 ```bash
 # Xem dung lượng ổ đĩa
@@ -106,7 +114,8 @@ dotfiles/
 ├── nvim/           → .config/nvim/ (LazyVim)
 ├── scripts/        → cleanup.sh và các script tiện ích
 ├── docs/           → Tài liệu này
-├── pkglist.txt     → Danh sách packages tham khảo
+├── pkglist.txt     → Package chính thức và AUR được setup.sh cài
+├── packages/       → Snapshot package thực tế trên máy
 ├── README.md       → Hướng dẫn cài đặt chính
 └── setup.sh        → Script stow tự động
 ```
