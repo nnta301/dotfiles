@@ -210,7 +210,6 @@ aur/grimblast-git
 aur/gtk-engine-murrine
 aur/hyde-cli-git
 aur/legacy-launcher
-aur/oh-my-zsh-git
 aur/onedrive-abraunegg
 aur/pokemon-colorscripts-git
 aur/postman-bin

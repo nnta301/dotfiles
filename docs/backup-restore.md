@@ -115,7 +115,7 @@ Sau khi cài Arch và hoàn tất `setup.sh`, cấu hình lại hai remote như 
 ./scripts/restore.sh archbackup:arch-20261105T010000Z-abcdefgh --apply
 ```
 
-Mặc định chỉ phục hồi các mục cấp đầu không ẩn để giữ cấu hình mới. Mỗi file được tải hoàn chỉnh vào file tạm và kiểm tra kích thước trước khi chuyển file trùng vào `~/.restore-backup-*` rồi thay thế; không xóa file thừa. Lỗi tải file hiện tại không làm mất file cũ. Thư mục mới, kể cả các thư mục cha trung gian, được tạo với quyền tối đa 700; thư mục đã tồn tại giữ quyền cũ, file thuộc user mới và giữ mode thường, bỏ setuid/setgid; không phục hồi ACL/xattrs/owner cũ cho home. Symlink/hardlink được báo bỏ qua. Mất mạng giữa chừng có thể để lại một phần đã restore; kiểm tra home và bản sao file cũ, không có rollback toàn bộ.
+Mặc định chỉ phục hồi các mục cấp đầu không ẩn để giữ cấu hình mới. Mỗi file được tải hoàn chỉnh vào file tạm và kiểm tra kích thước trước khi chuyển file trùng vào `~/.restore-backup-*` rồi thay thế; không xóa file thừa. Lỗi tải file hiện tại không làm mất file cũ. Thư mục mới, kể cả các thư mục cha trung gian, được tạo với quyền tối đa 700; thư mục đã tồn tại giữ quyền cũ, file thuộc user mới và giữ mode thường, bỏ setuid/setgid; không phục hồi ACL/xattrs/owner cũ cho home. Symlink trong archive được báo bỏ qua khi restore. Các file hardlink trong home được backup thành các file riêng, vì vậy nội dung có thể được phục hồi nhưng mối liên kết giữa chúng không được giữ. Mất mạng giữa chừng có thể để lại một phần đã restore; kiểm tra home và bản sao file cũ, không có rollback toàn bộ.
 
 Muốn lấy SSH keys hoặc một cấu hình cụ thể, chọn riêng:
 

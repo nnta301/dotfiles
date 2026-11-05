@@ -35,16 +35,17 @@ STOW_PACKAGES=(zsh nvim hypr fcitx5)
 # Patch only the downloaded installer, never an installed system driver.
 prepare_upstream_nvidia() {
     local upstream="$1" driver_script="$1/install-scripts/nvidia.sh"
-    local matches
+    local matches menu_matches
+    menu_matches=$(grep -Fc 'script will install nvidia-dkms, nvidia-utils, and nvidia-settings' "$upstream/install.sh") || true
     matches=$(grep -Ec '^[[:space:]]*nvidia-dkms[[:space:]]*$' "$driver_script") || true
-    if [[ "$matches" != 1 ]] || ! grep -Eq '^nvidia-open([[:space:]]*#.*)?[[:space:]]*$' "$DOTFILES_DIR/pkglist.txt"; then
+    if [[ "$matches" != 1 || "$menu_matches" != 1 ]] || ! grep -Eq '^nvidia-open([[:space:]]*#.*)?[[:space:]]*$' "$DOTFILES_DIR/pkglist.txt"; then
         error "Installer NVIDIA hoặc pkglist.txt đã thay đổi; dừng để kiểm tra trước khi cài."
         return 1
     fi
     cp -- "$driver_script" "$driver_script.before-dotfiles"
     sed -i -E 's/^([[:space:]]*)nvidia-dkms[[:space:]]*$/\1nvidia-open/' "$driver_script"
     # Keep the upstream menu description consistent with the actual package.
-    sed -i 's/nvidia-dkms/nvidia-open/g' "$upstream/install.sh"
+    sed -i 's/script will install nvidia-dkms, nvidia-utils, and nvidia-settings/script will install nvidia-open, nvidia-utils, and nvidia-settings/' "$upstream/install.sh"
     bash -n "$driver_script" || return 1
     bash -n "$upstream/install.sh" || return 1
     info "Installer NVIDIA đã dùng nvidia-open, cùng driver với pkglist.txt."
@@ -90,7 +91,12 @@ preflight_checks() {
         warn "Chọn 'dots' để cài cấu hình nền. Các lựa chọn khác phụ thuộc phần cứng."
         info "Installer và log: $bootstrap_dir/Arch-Hyprland"
         git clone --depth=1 https://github.com/JaKooLit/Arch-Hyprland.git "$bootstrap_dir/Arch-Hyprland"
-        prepare_upstream_nvidia "$bootstrap_dir/Arch-Hyprland"
+        if grep -Eq '^nvidia-open([[:space:]]*#.*)?[[:space:]]*$' "$DOTFILES_DIR/pkglist.txt"; then
+            prepare_upstream_nvidia "$bootstrap_dir/Arch-Hyprland"
+        else
+            warn "pkglist.txt không chọn nvidia-open; installer giữ driver NVIDIA mặc định upstream."
+            warn "Chỉ chọn mục NVIDIA nếu đã kiểm tra driver phù hợp GPU/kernel của máy."
+        fi
         (cd "$bootstrap_dir/Arch-Hyprland" && bash ./install.sh)
         if [[ ! -f "$HOME/.config/hypr/hyprland.conf" ]]; then
             error "Installer chưa tạo hyprland.conf; kiểm tra lựa chọn dots và log JaKooLit."

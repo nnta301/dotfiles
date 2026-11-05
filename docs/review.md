@@ -6,6 +6,12 @@
 
 Installer JaKooLit vẫn tải nhánh hiện hành. Chưa ghim revision vì chưa kiểm thử cài mới một revision cụ thể; xem đây là giới hạn cần xử lý trước khi format. Wiki Hyprland hiện tại dùng cú pháp mới, liên kết phiên bản cũ vẫn giữ cho các lệnh đang được hướng dẫn.
 
+## Đối chiếu audit bổ sung
+
+ChunkReader kiểm tra SHA-256 mỗi chunk khi tải, kể cả sau bước verify toàn bộ; có test giả lập chunk bị đổi giữa hai lần đọc. Chưa có bằng chứng định dạng cloud v2 hợp lệ từng được tạo với thiếu archive bắt buộc, nên không nới điều kiện manifest hoàn tất. Backup local cũ vẫn có luồng restore riêng.
+
+Setup chỉ sửa thông báo NVIDIA đúng mẫu đã kiểm tra và từ chối khi installer thay đổi; nếu danh sách không có `nvidia-open`, installer giữ driver upstream và người dùng phải xác định lựa chọn phù hợp. Đã bỏ gói `oh-my-zsh-git` khỏi danh sách vì shell dùng bản clone trong home; không tự gỡ gói đã cài. Xem cách xử lý Stow từ checkout cũ trong troubleshooting. So sánh `/etc` đang hoạt động có thể thất bại nếu nguồn thay đổi; không hạ lỗi này thành cảnh báo thành công vì chưa xác minh được bản sao khớp nguồn.
+
 ## Các lỗi đã xử lý
 
 - Restore home: tải file thay thế vào file tạm, kiểm tra kích thước trước khi di chuyển file cũ; thiếu dung lượng thì dừng trước khi ghi. Chặn đích nằm trên filesystem khác mount dưới home. Đọc theo thứ tự archive để giảm tải lại chunk qua mạng.

@@ -40,6 +40,24 @@ Khi chạy `./setup.sh` mà chưa có `hyprland.conf`, `setup.sh` tải và ch�
 - **Nguyên nhân:** File config gốc vẫn còn tồn tại (chưa được backup/xóa).
 - **Cách xử lý:** `setup.sh` chuyển file trùng và `UserConfigs` cũ vào `~/.dotfiles-backup.*`. Nếu vẫn lỗi, xem thông báo Stow và xử lý từng symlink hoặc thư mục xung đột; script không tự chạy `--adopt` hay `git checkout`.
 
+Nếu từng Stow từ checkout cũ, không xóa symlink hoặc chạy unstow từ checkout mới một cách máy móc. Xác định đường dẫn mà symlink đang trỏ tới (thay ví dụ bằng đúng đường dẫn có trong thông báo):
+
+```bash
+ls -ld ~/.config ~/.config/hypr ~/.config/nvim
+readlink -f ~/.config/nvim
+```
+
+Nếu checkout cũ vẫn còn, kiểm tra nội dung và trạng thái Git của nó, sao lưu thay đổi cần giữ. Chỉ sau khi xác nhận symlink thực sự do checkout đó tạo, chạy `stow -n -D` từ checkout cũ với đúng package để xem trước; nếu kết quả đúng mới chạy lại không có `-n`. Ví dụ cho `nvim`, thay đường dẫn cũ bằng đường dẫn thực tế:
+
+```bash
+cd /duong/dan/checkout-cu
+stow -n -D -t "$HOME" nvim
+# Sau khi xem kỹ kết quả và xác nhận đúng:
+stow -D -t "$HOME" nvim
+```
+
+Lặp lại riêng cho package bị ảnh hưởng. Nếu checkout cũ đã bị di chuyển/xóa hoặc symlink thuộc ứng dụng khác, không đoán nguồn và không dùng lệnh trên: kiểm tra từng liên kết, giữ bản sao cấu hình và xử lý thủ công. Sau đó chạy lại setup từ checkout mới; các file đã chuyển trước đó vẫn nằm trong thư mục backup mà setup đã in.
+
 ---
 
 ## 5. Hyprland báo lỗi deprecated dispatchers (JaKooLit upstream)

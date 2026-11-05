@@ -69,6 +69,28 @@ class CloudTests(unittest.TestCase):
             self.assertEqual((home / 'Documents/test.txt').read_bytes(), b'hello')
             self.assertFalse((home / 'home.tar').exists())
 
+    def test_chunk_changed_after_verification_is_rejected(self):
+        self.manifest(self.tarbytes())
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(cloud, 'remote_info'):
+            home = Path(tmp)
+            destination = home / 'Documents/test.txt'
+            destination.parent.mkdir()
+            destination.write_bytes(b'old data')
+            original = cloud.download
+            reads = {}
+            def changed_after_verify(path):
+                data = original(path)
+                if '/home.tar.part' in path:
+                    reads[path] = reads.get(path, 0) + 1
+                    if reads[path] > 1:
+                        return bytes([data[0] ^ 1]) + data[1:]
+                return data
+            args = argparse.Namespace(source='test:backup', export_system=None, apply=True, include=None)
+            with mock.patch.object(cloud, 'download', side_effect=changed_after_verify):
+                with self.assertRaisesRegex(ValueError, 'checksum'):
+                    cloud.restore(args, home)
+            self.assertEqual(destination.read_bytes(), b'old data')
+
     def test_export_only_system(self):
         self.manifest(self.tarbytes())
         with tempfile.TemporaryDirectory() as tmp, mock.patch.object(cloud, 'remote_info'):
