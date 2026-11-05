@@ -45,8 +45,9 @@ Repo này **không** theo dõi toàn bộ cấu hình Hyprland. Thay vào đó, 
 - [Hướng dẫn cài đặt](#-hướng-dẫn-cài-đặt)
 - [Cấu Trúc Repository](#-cấu-trúc-repository)
 - [Hyprland UserConfigs — Các Ghi Đè Chính](#-hyprland-userconfigs--các-ghi-đè-chính)
-- [Sử dụng màn hình ngoài hoặc máy chiếu](docs/man-hinh-ngoai.md)
+- [Sử dụng màn hình ngoài hoặc máy chiếu](docs/external-displays.md)
 - [Phím Tắt](#-phím-tắt)
+- [Kết quả rà soát và giới hạn kiểm thử](docs/review.md)
 
 ---
 
@@ -68,46 +69,31 @@ Repo này **không** theo dõi toàn bộ cấu hình Hyprland. Thay vào đó, 
 
 ## 🚀 Hướng dẫn cài đặt
 
-**Dual boot với Windows:** xem [hướng dẫn cài Arch và môi trường từng bước](docs/cai-arch-tu-windows.md). Hướng dẫn có cả nhánh tạo phân vùng Arch mới và cài lại vào phân vùng Arch cũ; đọc điều kiện, sao lưu và xác minh thiết bị trước khi format.
+**Dual boot với Windows:** xem [hướng dẫn cài Arch và môi trường từng bước](docs/arch-windows-dual-boot.md). Hướng dẫn có cả nhánh tạo phân vùng Arch mới và cài lại vào phân vùng Arch cũ; đọc điều kiện, sao lưu và xác minh thiết bị trước khi format.
+
+Muốn xóa Arch cũ để chia lại dung lượng trước khi cài, xem [hướng dẫn repartition](docs/repartition-arch.md).
 
 Các bước tóm tắt dưới đây dành cho hệ thống đã cài Arch.
 
+**Chuyển dữ liệu khi cài lại:** dùng [script backup/restore](docs/backup-restore.md) để tự lưu home, repo, thông tin máy, `/etc`, EFI lên OneDrive qua rclone crypt và phục hồi dữ liệu có kiểm tra checksum. Không đưa bản sao dữ liệu lên GitHub.
+
 Trước khi cài lại, xem [checklist sao lưu và khôi phục](docs/reinstall.md), bao gồm dữ liệu cá nhân, OneDrive, package và phân vùng EFI.
 
-### Bước 1 — Chạy Script Cài Đặt JaKooLit Upstream
+### Cài JaKooLit và cấu hình cá nhân
 
-> ⚠️ **Làm bước này trước.** Đây là bước tạo toàn bộ môi trường Hyprland bao gồm
-> cấu hình lõi, Waybar, theme và tất cả các dependency.
-
-```bash
-git clone --depth=1 https://github.com/JaKooLit/Arch-Hyprland.git ~/JaKooLit-Arch
-cd ~/JaKooLit-Arch
-chmod +x install.sh
-./install.sh
-```
-
-Bước này sẽ tạo `~/.config/hypr/` với các cấu hình mặc định upstream.
-Đăng nhập vào Hyprland ít nhất một lần để xác nhận hoạt động bình thường trước khi tiếp tục.
-
----
-
-### Bước 2 — Áp Dụng Cấu Hình Ghi Đè Cá Nhân (Repo Này)
+Trên Arch đã cài, đăng nhập bằng tài khoản thường có `sudo`, mạng và Git:
 
 ```bash
-# Clone repo này
 git clone https://github.com/nnta301/dotfiles.git ~/dotfiles
 cd ~/dotfiles
-
-# Chạy script setup (xử lý stow + tương thích JaKooLit)
-chmod +x setup.sh
-./setup.sh  # chọn 1 để cài package, chuẩn bị shell và áp dụng cấu hình
-
-# Script đọc pkglist.txt: gói aur/ dùng yay; cài Oh My Zsh và plugin còn thiếu.
-# Script sẽ chuyển các cấu hình trùng sang ~/.dotfiles-backup.* trước khi stow.
-# Khi gặp xung đột còn lại, script dừng để bạn kiểm tra.
+./setup.sh
 ```
 
-Sau khi stow, đăng xuất và đăng nhập lại. `SUPER + M` có thể thoát phiên Hyprland tùy cấu hình; không tự khởi động lại phiên. Nếu gặp cảnh báo deprecated, kiểm tra cấu hình và upstream trước khi vá.
+Nếu chưa có `~/.config/hypr/hyprland.conf`, script tải và chạy installer JaKooLit; trong menu của JaKooLit, chọn `dots` để cài cấu hình nền. Installer vẫn có các câu hỏi về GPU, SDDM và những tùy chọn khác. Trên máy RTX 2060 Mobile hiện tại, chọn `nvidia`, `dots` và `sddm`; setup chỉnh bản installer vừa tải để dùng `nvidia-open` giống `pkglist.txt`. Khi installer kết thúc, script dừng: đăng nhập Hyprland và kiểm tra hoạt động, rồi chạy lại `~/dotfiles/setup.sh` để cài package và áp dụng cấu hình cá nhân.
+
+Nếu đã có `hyprland.conf`, script bỏ qua bước cài nền: file này chỉ là dấu hiệu, không chứng minh đó là cấu hình JaKooLit. Hãy xác nhận nền JaKooLit đang hoạt động trước khi áp dụng. Đọc [hướng dẫn chi tiết](docs/arch-windows-dual-boot.md) về phần cứng và các giới hạn tương thích.
+
+Sau khi nền hoạt động, `./setup.sh` cài toàn bộ package chính thức và AUR trong `pkglist.txt`, ứng dụng Flatpak trong `packages/flatpak-apps.txt`, chuẩn bị shell và áp dụng cấu hình qua Stow. Các installer vẫn có thể hỏi xác nhận; script backup file trùng vào `~/.dotfiles-backup.*` và dừng nếu gặp lỗi.
 
 ---
 
@@ -115,11 +101,11 @@ Sau khi stow, đăng xuất và đăng nhập lại. `SUPER + M` có thể thoá
 
 ```
 dotfiles/
-├── 📄 .gitignore                  ← Loại trừ secrets, cache, file lock nvim
+├── 📄 .gitignore                  ← Loại trừ secrets, cache và backup cá nhân
 ├── 📄 README.md                   ← File này
 ├── 📄 pkglist.txt                 ← Package chính thức và AUR được setup.sh cài
 ├── 📂 packages/                   ← Danh sách package ghi lại từ máy hiện tại
-├── 📄 setup.sh                    ← Script setup một lần
+├── 📄 setup.sh                    ← Cài nền, package và áp cấu hình
 │
 ├── 📂 hypr/                       ← Cấu hình Hyprland cá nhân
 │   └── .config/hypr/              ← UserConfigs
@@ -149,7 +135,11 @@ dotfiles/
 │
 ├── 📂 fcitx5/                     ← Profile bộ gõ tiếng Việt
 └── 📂 scripts/                    ← Script tiện ích
-    └── cleanup.sh                 ← Dọn dẹp cache Pacman + orphan + journal
+    ├── cleanup.sh                 ← Dọn cache Pacman + orphan + journal
+    ├── backup.sh                  ← Backup mã hóa lên OneDrive
+    ├── restore.sh                 ← Kiểm tra và phục hồi dữ liệu home
+    ├── cloud_backup.py            ← Upload/đọc cloud theo từng phần
+    └── transfer.py                ← Kiểm tra/restore và hỗ trợ backup local cũ
 ```
 
 > `lazy-lock.json` lưu phiên bản plugin Neovim để khôi phục nhất quán. Sau khi cập nhật plugin, kiểm tra và commit thay đổi lockfile nếu muốn giữ phiên bản mới.
@@ -188,9 +178,7 @@ env = QT_IM_MODULE, fcitx
 env = XMODIFIERS, @im=fcitx
 ```
 
-> ⚠️ **`GTK_IM_MODULE` bị bỏ qua có chủ ý.** GTK4 đã bỏ hỗ trợ cho
-> `GTK_IM_MODULE` — đặt biến này gây lỗi hồi quy trong các ứng dụng GTK4. Fcitx5 xử lý
-> tích hợp GTK4 tự động qua D-Bus portal.
+> Repo không đặt `GTK_IM_MODULE` toàn cục để GTK chạy Wayland có thể dùng đường nhập liệu Wayland. Cách cấu hình còn phụ thuộc ứng dụng/compositor; xem [Fcitx trên Wayland](https://fcitx-im.org/wiki/Using_Fcitx_5_on_Wayland).
 
 ---
 

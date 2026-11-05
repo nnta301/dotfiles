@@ -1,25 +1,77 @@
-# Chuẩn bị cài lại máy
+# Cài lại Arch với backup OneDrive
 
-Kiểm tra ngày 04/11/2026: máy dùng Arch, Hyprland JaKooLit, kernel Linux, `nvidia-open`, OneDrive client và có các phân vùng Windows/BitLocker. Đây là ảnh chụp tại thời điểm kiểm tra, cần đối chiếu lại trước khi cài.
+Cập nhật 05/11/2026: luồng chính dùng **backup mã hóa trên OneDrive**, không cần ổ backup ngoài. USB chỉ để boot cài Arch. Giữ Windows dual boot UEFI/GPT; xem phạm vi phần cứng/phân vùng trong [hướng dẫn cài đặt](arch-windows-dual-boot.md).
 
-## Trước khi cài
+## 1. Chuẩn bị OneDrive một lần
 
-1. Sao lưu dữ liệu cá nhân, dự án, thư mục home và cấu hình ứng dụng ra ổ ngoài. Xác nhận mở được các file trong bản sao. Thư mục repo đang nằm trong `~/OneDrive`, trên cùng phân vùng Linux với hệ điều hành; không coi đó là bản sao độc lập.
-2. Kiểm tra OneDrive đã đồng bộ đầy đủ bằng client và đối chiếu file trên dịch vụ. Dịch vụ `onedrive.service` được cấu hình bật ở máy cũ, nhưng điều đó không chứng minh toàn bộ dữ liệu đã được đồng bộ. Giữ thêm bản sao ngoại tuyến.
-3. Commit các thay đổi cần giữ, push và kiểm tra chúng đã xuất hiện trên remote; cũng sao lưu repo ra ổ ngoài. Tại lần kiểm tra này nhánh local còn 2 commit chưa push và có thay đổi chưa commit.
-4. Sao lưu riêng và bảo vệ bằng mã hóa những thứ không nằm trong repo: SSH/GPG keys, thông tin khôi phục 2FA, cấu hình và dữ liệu ứng dụng, database, profile trình duyệt, cấu hình VPN, kết nối mạng, và các credential cần thiết. Không commit secrets vào repo. Kiểm tra quyền truy cập tài khoản và mã khôi phục BitLocker trước khi thao tác phân vùng.
-   Ghi lại tên người dùng, UID/GID và các nhóm cần dùng trước khi cài lại; đối chiếu quyền sở hữu khi khôi phục file từ bản sao. Xem bước tạo tài khoản trong [hướng dẫn cài đặt](cai-arch-tu-windows.md).
-5. Xác nhận đúng ổ đĩa, phân vùng và điểm mount trong trình cài đặt. Máy có các phân vùng NTFS và BitLocker cùng ổ; tránh format nhầm Windows hoặc EFI. `/boot` hiện là phân vùng EFI chỉ 96 MB, còn khoảng 4 MB ở lần kiểm tra. Với trường hợp cài lại Arch cũ, làm [bước sao lưu EFI](cai-arch-tu-windows.md#02-sao-lưu-efi-trước-khi-cài-lại-arch-cũ) và [bước xử lý boot Arch cũ](cai-arch-tu-windows.md#41-lấy-lại-chỗ-từ-boot-arch-cũ-khi-efi-gần-đầy) theo đúng điều kiện trong hướng dẫn. Không format EFI hoặc tự xóa file Windows.
+Làm [bước cấu hình rclone/crypt](backup-restore.md#1-cấu-hình-một-lần-trên-arch-cũ): tạo `onedrive:` trỏ đúng tài khoản và `archbackup:` mã hóa vào `onedrive:ArchBackups`. Giữ mật khẩu crypt, salt và cách đăng nhập/2FA ngoài Arch. Không chỉ lưu khóa bên trong backup mã hóa.
 
-## Khôi phục sau khi cài
+Kiểm tra quota thật bằng `rclone about onedrive:`. Ổ Arch 70 GB không bảo đảm backup luôn vừa quota: các bản backup cũ, repo lưu riêng và dung lượng còn lại trên cloud đều tính vào giới hạn. Script ước lượng trước upload và không tạo bản home lớn trên ổ local đang gần đầy.
 
-Nếu cài Arch song song và giữ Windows, xem [hướng dẫn dual boot từng bước](cai-arch-tu-windows.md), gồm nhánh cài lại trên phân vùng Arch cũ sau khi xác minh và sao lưu.
+## 2. Backup từ Arch cũ
 
-1. Cài Arch, mạng, driver và bootloader phù hợp với phần cứng; xác nhận cả hệ điều hành khác vẫn khởi động. Cài JaKooLit upstream theo README và xác nhận phiên Hyprland hoạt động.
-2. Clone repo, chạy `./setup.sh`, chọn mục 1 để cài package, chuẩn bị shell và áp cấu hình. Script lưu các file trùng và thư mục `UserConfigs` cũ vào `~/.dotfiles-backup.*`; kiểm tra thông báo nếu Stow dừng do xung đột.
-3. `packages/explicit-repo.txt` là danh sách 178 package chính thức được cài chủ động tại thời điểm kiểm tra; `packages/explicit-foreign.txt` là các gói ngoài repo được cài chủ động. `packages/all-foreign.txt` liệt kê cả các gói ngoài được cài làm dependency. Tên và nguồn package có thể thay đổi, nhất là gói `-git`; xem từng danh sách trước khi cài, không cài mù toàn bộ driver hoặc các gói JaKooLit cũ. `pkglist.txt` là danh sách setup.sh cài: dòng `aur/` dùng yay, các dòng khác dùng Pacman; không phải snapshot toàn bộ máy.
-4. `packages/flatpak-apps.txt` ghi lại ID ứng dụng Flatpak; cần cấu hình remote và cài lại nếu muốn. Dữ liệu của các ứng dụng vẫn cần sao lưu riêng.
-5. Kiểm tra Oh My Zsh, theme `agnosterzak`, plugins và bộ gõ sau khi chạy setup. Profile Fcitx5 đã được lưu trong repo. Cấu hình fastfetch và nhiều thành phần giao diện khác vẫn do JaKooLit quản lý; nếu đã chỉnh riêng, hãy sao lưu chúng từ máy cũ.
-6. Đăng nhập lại OneDrive và các dịch vụ; khôi phục dữ liệu từ bản sao, kiểm tra project, bộ gõ và ứng dụng trước khi xóa bản sao cũ.
+Lưu công việc, đóng ứng dụng đang ghi dữ liệu. Trong repo thật:
 
-Repo không sao lưu dữ liệu cá nhân, tài khoản, cấu hình toàn hệ thống hay phiên bản JaKooLit upstream. Vì vậy cần giữ bản sao độc lập cho đến khi kiểm tra xong máy mới.
+```bash
+cd ~/OneDrive/Documents/dotfiles
+./scripts/backup.sh
+```
+
+Thay `cd` nếu repo ở nơi khác. Nhập mật khẩu sudo khi được hỏi. Script tự lưu home, repo chưa commit, Git bundle, báo cáo máy, `/etc`, EFI; gửi từng phần mã hóa rồi tải lại kiểm tra. Không cần các bước tar hoặc git bundle thủ công.
+
+Ghi lại đích được in, ví dụ `archbackup:arch-20261105T010000Z-abcdefgh`. Nếu lỗi, chưa dùng bản đó để format; không có manifest hoàn tất thì chưa phải bản backup đầy đủ. Script giữ OneDrive sync dừng để tránh tải cả backup ngược về ổ local. Xem [cách loại ArchBackups khỏi sync](backup-restore.md#onedrive-sync-sau-backup) trước khi bật lại client, kể cả trên Windows.
+
+Database/Docker volumes ngoài home phải xuất riêng nếu có dữ liệu cần giữ. Cache, filesystem con và đích symlink không được tự lưu; xem báo cáo. Dữ liệu OneDrive chỉ có trên cloud không được coi là bản sao local đã nằm trong archive.
+
+## 3. Kiểm tra có thể phục hồi trước khi xóa
+
+Trong repo, thay ID bằng bản thật:
+
+```bash
+./scripts/restore.sh archbackup:arch-20261105T010000Z-abcdefgh --dry-run
+```
+
+Lệnh kiểm tra toàn bộ archive trên cloud và liệt kê dữ liệu sẽ restore. Dùng thiết bị khác hoặc USB live để thử đăng nhập, cấu hình lại crypt với khóa đã lưu và tải các archive tham khảo:
+
+```bash
+./scripts/restore.sh archbackup:arch-20261105T010000Z-abcdefgh --export-system /tmp/arch-rescue
+```
+
+Xem [cách chuẩn bị công cụ trong USB](backup-restore.md#4-lấy-báo-cáo-và-efi-trước-khi-phân-vùng). Đích export phải là thư mục mới và đủ chỗ. `metadata.tar` chứa báo cáo phân vùng và `REPORT.txt`; `efi.tar` dùng đối chiếu trước xử lý boot cũ. Thử đọc dữ liệu quan trọng, giải quyết mọi cảnh báo về phần chưa sao lưu. Export hệ thống không thay thế dry-run kiểm tra home.
+
+**Trước format phải có:** backup hoàn tất và truy cập được ngoài Arch, khóa giải mã/2FA, BitLocker recovery key, USB UEFI có mạng và sơ đồ đúng root/ESP. Không xóa Arch nếu công cụ hoặc khóa phục hồi duy nhất nằm trong Arch.
+
+Các thay đổi repo chưa push không có khi clone GitHub. Push mã/config đã kiểm tra hoặc giữ bộ script trên Windows/thiết bị khác. `repo.tar` trong cloud giữ thay đổi chưa commit nhưng vẫn cần công cụ và khóa để lấy lại.
+
+## 4. Cài lại hoặc chia lại phân vùng
+
+Tạo USB theo [hướng dẫn dual boot](arch-windows-dual-boot.md). Tắt Fast Startup/hibernate Windows và kiểm tra Windows Boot Manager boot trực tiếp. Sau khi boot USB, lấy báo cáo và EFI từ cloud như bước 3 **trước khi xóa/format**.
+
+- Giữ nguyên kích thước root cũ: làm Cách A ở hướng dẫn chính.
+- Muốn xóa Arch để chia lại dung lượng: làm [nhánh repartition](repartition-arch.md).
+- EFI gần đầy: mục 4.1 hướng dẫn chính dùng `efi.tar` đã export để so sánh; không format ESP. Root mới mount `/mnt`, ESP mount `/mnt/efi`, kernel nằm trên ext4 ở `/boot`.
+
+Tạo fstab và GRUB mới, không chép cấu hình boot cũ đè lên máy mới.
+
+## 5. Setup và restore trên Arch mới
+
+Đăng nhập user thường, clone repo và chạy:
+
+```bash
+git clone https://github.com/nnta301/dotfiles.git ~/dotfiles
+cd ~/dotfiles
+./setup.sh
+```
+
+Nếu setup cài nền JaKooLit rồi dừng, trên máy hiện tại chọn `nvidia`, `dots`, `sddm` khi phù hợp, đăng nhập kiểm tra Hyprland rồi chạy setup lần nữa. Nếu đã hoàn tất thì không cần lặp lại.
+
+Cấu hình lại rclone/crypt bằng **cùng mật khẩu và salt**, sau đó:
+
+```bash
+./scripts/restore.sh archbackup:arch-20261105T010000Z-abcdefgh --dry-run
+./scripts/restore.sh archbackup:arch-20261105T010000Z-abcdefgh --apply
+```
+
+Mặc định phục hồi dữ liệu không ẩn; muốn cấu hình/khóa, dùng `--include .ssh` hoặc đường dẫn cụ thể sau khi xem trước. File trùng được giữ ở `~/.restore-backup-*`; không tự phục hồi `/etc`, EFI hay database. Nếu muốn lấy repo chưa push, export hệ thống rồi mở `repo.tar` vào thư mục riêng trống, kiểm tra và chạy setup từ bản đó.
+
+Đăng nhập lại dịch vụ, kiểm tra project, tài liệu, bộ gõ, màn hình và cả Windows/Arch. Không bật OneDrive sync cả thư mục ArchBackups và không xóa backup cho đến khi xác nhận đầy đủ. Xem [chi tiết restore và giới hạn](backup-restore.md), [các bước sau setup](manual-steps.md).

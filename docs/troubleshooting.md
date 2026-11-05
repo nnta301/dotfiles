@@ -2,6 +2,10 @@
 
 Ghi lại các lỗi từng gặp trên hệ thống Arch Linux và cách xử lý.
 
+## Installer JaKooLit không tạo cấu hình
+
+Khi chạy `./setup.sh` mà chưa có `hyprland.conf`, `setup.sh` tải và chạy installer JaKooLit từ thư mục `~/.cache/jakoolit-install.*/Arch-Hyprland` được in trên màn hình. Nếu installer lỗi hoặc kết thúc mà không có file cấu hình, setup dừng. Kiểm tra mạng, thông báo và log trong thư mục đó; xác nhận đã chọn `dots`, rồi chạy lại setup sau khi khắc phục. Script chỉ kiểm tra sự tồn tại của file, không xác nhận được phiên Hyprland có hoạt động hay không.
+
 ---
 
 ## 1. Lỗi Pacman: "Error reading fd 7" khi chạy cache clean
@@ -20,19 +24,13 @@ Ghi lại các lỗi từng gặp trên hệ thống Arch Linux và cách xử l
      ```bash
      journalctl -b -p err
      ```
-  3. Xác định GPU và driver NVIDIA đang dùng trước khi thay đổi. Máy cũ dùng `nvidia-open`, trong khi một số lựa chọn JaKooLit cài `nvidia-dkms`; hai lựa chọn có thể xung đột. Kiểm tra tài liệu driver cho phần cứng và kernel của bạn, không tự thay driver chỉ vì màn hình đen.
+  3. Xác định GPU và driver NVIDIA đang dùng trước khi thay đổi. Máy cũ dùng `nvidia-open`, setup đã chỉnh bản installer tải về để cũng dùng `nvidia-open`. Nếu từng chạy installer JaKooLit riêng và đã có `nvidia-dkms`, setup vẫn dừng khi phát hiện xung đột; không tự gỡ driver đang chạy. Kiểm tra tài liệu driver cho phần cứng và kernel của bạn, không tự thay driver chỉ vì màn hình đen.
 
 ---
 
-## 3. Lỗi `yay` không build được package AUR
+## 3. AUR báo lỗi kiểm tra nguồn khi build
 
-- **Triệu chứng:** `ERROR: One or more files did not pass the validity check!`
-- **Nguyên nhân:** Keyring chưa được cập nhật.
-- **Cách xử lý:**
-  ```bash
-  sudo pacman -Syu archlinux-keyring
-  sudo pacman-key --populate archlinux
-  ```
+`One or more files did not pass the validity check` không đủ để kết luận keyring Arch bị cũ. Đọc các dòng trước lỗi để phân biệt checksum không khớp, chữ ký PGP hoặc tải nguồn thất bại. Đối chiếu nguồn và PKGBUILD với maintainer; không dùng `--skipinteg` để bỏ qua lỗi. Key dùng ký nguồn AUR có thể thuộc keyring GPG của user, khác keyring package chính thức của Pacman. Xem [makepkg](https://man.archlinux.org/man/makepkg.8.en).
 
 ---
 
@@ -48,13 +46,7 @@ Ghi lại các lỗi từng gặp trên hệ thống Arch Linux và cách xử l
 
 - **Triệu chứng:** Log Hyprland có cảnh báo về `togglesplit`, `pseudotile`, hay `vfr`.
 - **Nguyên nhân:** JaKooLit upstream chưa cập nhật các dispatcher cũ.
-- **Cách xử lý tạm thời:**
-  ```bash
-  sed -i '/togglesplit/s/^/#/' ~/.config/hypr/UserConfigs/UserKeybinds.conf
-  sed -i '/pseudotile/s/^/#/'  ~/.config/hypr/UserConfigs/UserKeybinds.conf
-  sed -i '/^\s*vfr\s*=/s/^/#/' ~/.config/hypr/hyprland.conf
-  ```
-  > Kiểm tra upstream đã fix chưa: https://github.com/JaKooLit/Arch-Hyprland/issues
+- **Cách xử lý:** Kiểm tra thông báo cụ thể và hướng dẫn upstream trước khi sửa cấu hình. Sao lưu file, kiểm tra nó có phải symlink Stow hay không bằng `ls -l`; nếu file được repo quản lý, chỉnh bản trong repo. Không tự chạy các lệnh vá cũ trên mọi phiên bản. Xem [issue upstream](https://github.com/JaKooLit/Arch-Hyprland/issues).
 
 ---
 
@@ -74,7 +66,7 @@ Ghi lại các lỗi từng gặp trên hệ thống Arch Linux và cách xử l
   env = QT_IM_MODULE, fcitx
   env = XMODIFIERS, @im=fcitx
   ```
-  **Không** set `GTK_IM_MODULE` — GTK4 không dùng biến này nữa (gây lỗi).
+  Repo không đặt `GTK_IM_MODULE` toàn cục để ứng dụng GTK chạy Wayland có thể dùng đường nhập liệu Wayland. GTK3/GTK4 vẫn có cơ chế IM module; lựa chọn phụ thuộc ứng dụng và compositor. Đối chiếu [Fcitx trên Wayland](https://fcitx-im.org/wiki/Using_Fcitx_5_on_Wayland), không coi lỗi riêng một ứng dụng là lý do đổi biến cho toàn phiên.
 
 ---
 
@@ -85,16 +77,17 @@ Ghi lại các lỗi từng gặp trên hệ thống Arch Linux và cách xử l
 
 ---
 
-## 8. Hyprland không nhận màn hình sau khi resume từ sleep
+## 8. Màn hình đen sau sleep hoặc HDMI không nhận
 
-- **Triệu chứng:** Màn hình trắng/đen sau khi mở laptop.
-- **Cách xử lý tạm thời:** `SUPER + M` để thoát, rồi đăng nhập lại.
-- **Fix lâu dài:** Kiểm tra JaKooLit upstream có script `swayidle` hoặc `hypridle` không,
-  hoặc thêm vào `UserConfigs/Startup_Apps.conf`:
-  ```conf
-  exec-once = hypridle
-  ```
+Trong terminal/TTY còn truy cập được, xem `journalctl -b -p err`; trong phiên Hyprland kiểm tra `hyprctl monitors all`. Đọc [hướng dẫn màn hình ngoài](external-displays.md) về tên cổng và chế độ GPU. Lưu công việc trước khi đăng xuất/reboot. Không mặc định một phím tắt sẽ thoát phiên và không thêm `exec-once = hypridle` khi chưa kiểm tra cấu hình đã khởi chạy daemon hay chưa.
 
----
+## 9. Backup/restore báo lỗi
 
-*Cập nhật lần cuối: 2026-08-09*
+- Backup cloud không có `manifest.json` qua remote crypt: bước bắt buộc chưa hoàn tất. Đọc lỗi đầu tiên và `REPORT.txt` nếu có; không dùng bản đó làm cơ sở format.
+- Không xác định ESP: kiểm tra mount thực tế, Windows Boot Manager và phạm vi dual boot; không mount một phân vùng đoán mò để vượt kiểm tra.
+- Checksum sai hoặc thiếu file: giữ nguyên bản gốc, kiểm tra remote, khóa crypt và kết nối OneDrive; không sửa checksum cho khớp để ép restore.
+- Restore báo symlink/thư mục xung đột: kiểm tra đường dẫn đích; không xóa đích liên kết chỉ để tiếp tục. File đã thay thế nằm trong `~/.restore-backup-*`.
+
+Xem [backup/restore](backup-restore.md) và [checklist cài lại](reinstall.md). Restore mặc định xem trước, chỉ ghi với `--apply`; EFI và `/etc` không tự phục hồi.
+
+*Cập nhật lần cuối: 2026-11-05*

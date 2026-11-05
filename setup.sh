@@ -2,8 +2,7 @@
 # ╔══════════════════════════════════════════════════════════════════╗
 # ║              Personal Dotfiles — Override Layer Setup            ║
 # ║                                                                  ║
-# ║  This script applies ONLY the personal override layer.           ║
-# ║  It assumes JaKooLit's upstream script has already been run.     ║
+# ║  Installs the JaKooLit base when needed, then personal configs.  ║
 # ║                                                                  ║
 # ║  Usage: chmod +x setup.sh && ./setup.sh                         ║
 # ╚══════════════════════════════════════════════════════════════════╝
@@ -32,6 +31,26 @@ DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # NOTE: 'hypr' only contains UserConfigs/ — JaKooLit manages the core config.
 STOW_PACKAGES=(zsh nvim hypr fcitx5)
 
+# This personal repo targets the current RTX 2060 + stock linux kernel.
+# Patch only the downloaded installer, never an installed system driver.
+prepare_upstream_nvidia() {
+    local upstream="$1" driver_script="$1/install-scripts/nvidia.sh"
+    local matches
+    matches=$(grep -Ec '^[[:space:]]*nvidia-dkms[[:space:]]*$' "$driver_script") || true
+    if [[ "$matches" != 1 ]] || ! grep -Eq '^nvidia-open([[:space:]]*#.*)?[[:space:]]*$' "$DOTFILES_DIR/pkglist.txt"; then
+        error "Installer NVIDIA hoặc pkglist.txt đã thay đổi; dừng để kiểm tra trước khi cài."
+        return 1
+    fi
+    cp -- "$driver_script" "$driver_script.before-dotfiles"
+    sed -i -E 's/^([[:space:]]*)nvidia-dkms[[:space:]]*$/\1nvidia-open/' "$driver_script"
+    # Keep the upstream menu description consistent with the actual package.
+    sed -i 's/nvidia-dkms/nvidia-open/g' "$upstream/install.sh"
+    bash -n "$driver_script" || return 1
+    bash -n "$upstream/install.sh" || return 1
+    info "Installer NVIDIA đã dùng nvidia-open, cùng driver với pkglist.txt."
+    info "Trên máy này, chọn nvidia, dots và sddm trong menu JaKooLit."
+}
+
 # ═══════════════════════════════════════════════════════════════════
 #  Preflight checks
 # ═══════════════════════════════════════════════════════════════════
@@ -44,18 +63,44 @@ preflight_checks() {
         exit 1
     fi
     success "Arch Linux detected"
+    if (( EUID == 0 )); then
+        error "Hãy chạy setup.sh bằng tài khoản thường; script dùng sudo khi cần."
+        exit 1
+    fi
+    # A full system update or the upstream installer may rebuild initramfs.
+    # A small EFI mounted at /boot needs free working space for that operation.
+    local boot_type boot_available
+    boot_type=$(findmnt -n -o FSTYPE --target /boot) || { error "Không xác định được filesystem /boot."; exit 1; }
+    boot_available=$(df -Pk /boot | awk 'NR==2 {print $4}') || { error "Không đọc được dung lượng /boot."; exit 1; }
+    [[ "$boot_available" =~ ^[0-9]+$ ]] || { error "Không xác định được dung lượng /boot."; exit 1; }
+    if [[ "$boot_type" == vfat ]] && (( boot_available < 32768 )); then
+        error "/boot là EFI và còn dưới 32 MiB; xử lý dung lượng boot trước khi cập nhật."
+        error "Xem docs/arch-windows-dual-boot.md và sao lưu EFI; không xóa file Windows."
+        exit 1
+    fi
 
-    # Check JaKooLit upstream was run (look for its core config)
-    if [[ "$choice" != 4 && ! -f "$HOME/.config/hypr/hyprland.conf" ]]; then
-        warn "Không tìm thấy ~/.config/hypr/hyprland.conf"
-        warn "Hãy chạy JaKooLit upstream install script trước:"
-        warn "  git clone --depth=1 https://github.com/JaKooLit/Arch-Hyprland.git ~/JaKooLit-Arch"
-        warn "  cd ~/JaKooLit-Arch && ./install.sh"
-        echo ""
-        read -rp "$(echo -e "${YELLOW}Tiếp tục mà không có upstream? [y/N]:${NC} ")" cont
-        [[ "${cont,,}" == "y" ]] || { info "Thoát."; exit 0; }
-    elif [[ "$choice" != 4 ]]; then
-        success "JaKooLit upstream config found"
+    # The installer is interactive; stop afterwards so the user can verify
+    # the new graphical session before applying the personal overlay.
+    if [[ ! -f "$HOME/.config/hypr/hyprland.conf" ]]; then
+        command -v git >/dev/null || { error "Cần git để tải JaKooLit; cài git trước."; exit 1; }
+        local bootstrap_dir
+        mkdir -p "$HOME/.cache"
+        bootstrap_dir=$(mktemp -d "$HOME/.cache/jakoolit-install.XXXXXXXX")
+        warn "Chưa có cấu hình Hyprland; tải và chạy installer JaKooLit tương tác."
+        warn "Chọn 'dots' để cài cấu hình nền. Các lựa chọn khác phụ thuộc phần cứng."
+        info "Installer và log: $bootstrap_dir/Arch-Hyprland"
+        git clone --depth=1 https://github.com/JaKooLit/Arch-Hyprland.git "$bootstrap_dir/Arch-Hyprland"
+        prepare_upstream_nvidia "$bootstrap_dir/Arch-Hyprland"
+        (cd "$bootstrap_dir/Arch-Hyprland" && bash ./install.sh)
+        if [[ ! -f "$HOME/.config/hypr/hyprland.conf" ]]; then
+            error "Installer chưa tạo hyprland.conf; kiểm tra lựa chọn dots và log JaKooLit."
+            exit 1
+        fi
+        success "Installer đã tạo cấu hình Hyprland."
+        info "Đăng nhập Hyprland, kiểm tra hoạt động, rồi chạy lại ./setup.sh để áp dụng repo."
+        exit 0
+    else
+        info "Đã có hyprland.conf; xác nhận đây là cấu hình JaKooLit hoạt động trước khi tiếp tục."
     fi
 }
 
@@ -98,6 +143,15 @@ backup_existing() {
 stow_configs() {
     header "Applying Stow Packages"
     info "Packages: ${STOW_PACKAGES[*]}"
+    # Check before moving UserConfigs: traversing a parent symlink could move
+    # files from another checkout (or the source repo itself).
+    local parent
+    for parent in "$HOME/.config" "$HOME/.config/hypr"; do
+        if [[ -L "$parent" ]]; then
+            error "Thư mục cha là symlink: $parent; chưa di chuyển hay áp cấu hình."
+            return 1
+        fi
+    done
     BACKUP_DIR=$(mktemp -d "$HOME/.dotfiles-backup.XXXXXXXX")
     info "Bản sao cấu hình cũ: $BACKUP_DIR"
     echo ""
@@ -130,34 +184,6 @@ stow_configs() {
 }
 
 # ═══════════════════════════════════════════════════════════════════
-#  Patch deprecated Hyprland dispatchers (upstream JaKooLit)
-# ═══════════════════════════════════════════════════════════════════
-patch_deprecations() {
-    header "Patching Deprecated Hyprland Dispatchers"
-    warn "Kiểm tra upstream JaKooLit trước khi chạy bước này:"
-    warn "  https://github.com/JaKooLit/Arch-Hyprland/issues"
-    echo ""
-    read -rp "$(echo -e "${CYAN}Áp dụng patch deprecated dispatchers? [y/N]:${NC} ")" apply
-
-    if [[ "${apply,,}" == "y" ]]; then
-        local keybinds="$HOME/.config/hypr/UserConfigs/UserKeybinds.conf"
-        local hyprconf="$HOME/.config/hypr/hyprland.conf"
-
-        if [[ -f "$keybinds" ]]; then
-            sed -i '/togglesplit/s/^/#/' "$keybinds" 2>/dev/null || true
-            sed -i '/pseudotile/s/^/#/' "$keybinds" 2>/dev/null || true
-            success "  Commented out togglesplit / pseudotile in UserKeybinds.conf"
-        fi
-        if [[ -f "$hyprconf" ]]; then
-            sed -i '/^\s*vfr\s*=/s/^/#/' "$hyprconf" 2>/dev/null || true
-            success "  Commented out vfr in hyprland.conf"
-        fi
-    else
-        info "  Bỏ qua patch."
-    fi
-}
-
-# ═══════════════════════════════════════════════════════════════════
 #  Install official packages and shell prerequisites
 # ═══════════════════════════════════════════════════════════════════
 install_extra_pkgs() {
@@ -186,14 +212,15 @@ install_extra_pkgs() {
         done
     done < "$list"
     (( ${#packages[@]} )) || { error "Danh sách package trống: $list"; return 1; }
-    if (( EUID == 0 )); then
-        error "Hãy chạy setup.sh bằng tài khoản thường; script dùng sudo khi cần."
-        return 1
-    fi
-    if printf '%s\n' "${packages[@]}" | grep -qx nvidia-open && pacman -Q nvidia-dkms >/dev/null 2>&1; then
-        error "Máy đang cài nvidia-dkms nhưng pkglist.txt yêu cầu nvidia-open."
-        error "Dừng để bạn kiểm tra driver phù hợp và sửa danh sách trước khi tiếp tục."
-        return 1
+    if printf '%s\n' "${packages[@]}" | grep -qx nvidia-open; then
+        local driver
+        for driver in nvidia nvidia-dkms nvidia-open-dkms; do
+            if pacman -Q "$driver" >/dev/null 2>&1; then
+                error "Máy đang cài $driver nhưng pkglist.txt yêu cầu nvidia-open."
+                error "Dừng để kiểm tra driver trước khi tiếp tục; không tự gỡ driver đang chạy."
+                return 1
+            fi
+        done
     fi
     info "Cập nhật hệ thống và cài ${#packages[@]} package từ repo chính thức."
     sudo pacman -Syu --needed -- "${packages[@]}"
@@ -211,10 +238,36 @@ install_extra_pkgs() {
             (cd "$build_dir/yay" && makepkg -si)
             command -v yay >/dev/null || { error "Cài yay thất bại."; return 1; }
         fi
+        local aur_check
+        if ! aur_check=$(yay -Si --aur -- "${aur_packages[@]}" 2>&1); then
+            error "Không thể xác minh toàn bộ danh sách AUR; kiểm tra tên gói và kết nối."
+            printf '%s\n' "$aur_check" >&2
+            return 1
+        fi
         info "Cài ${#aur_packages[@]} package AUR bằng yay; kiểm tra các lời nhắc trước khi xác nhận."
         yay -S --aur --needed -- "${aur_packages[@]}"
         success "Đã cài package AUR."
     fi
+}
+
+install_flatpaks() {
+    header "Cài ứng dụng Flatpak"
+    local list="$DOTFILES_DIR/packages/flatpak-apps.txt" line
+    local -a apps=()
+    command -v flatpak >/dev/null || { error "Chưa cài flatpak; cài package flatpak trước."; return 1; }
+    [[ -r "$list" ]] || { error "Không đọc được $list"; return 1; }
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line=${line%%#*}
+        [[ -z "$line" ]] && continue
+        if [[ ! "$line" =~ ^[A-Za-z0-9_]+(\.[A-Za-z0-9_-]+)+$ ]]; then
+            error "ID Flatpak không hợp lệ: $line"; return 1
+        fi
+        apps+=("$line")
+    done < "$list"
+    (( ${#apps[@]} )) || { info "Danh sách Flatpak trống."; return 0; }
+    info "Thêm Flathub cho user nếu chưa có và cài ${#apps[@]} ứng dụng."
+    flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+    flatpak install --user --or-update flathub "${apps[@]}"
 }
 
 install_zsh_assets() {
@@ -259,57 +312,26 @@ main() {
     echo ""
     echo -e "${CYAN}${BOLD}╔══════════════════════════════════════════════╗${NC}"
     echo -e "${CYAN}${BOLD}║    Personal Dotfiles — Override Layer        ║${NC}"
-    echo -e "${CYAN}${BOLD}║    (assumes JaKooLit upstream already run)   ║${NC}"
+    echo -e "${CYAN}${BOLD}║    JaKooLit base + personal configuration    ║${NC}"
     echo -e "${CYAN}${BOLD}╚══════════════════════════════════════════════╝${NC}"
     echo ""
 
-    echo -e "${BOLD}Chọn hành động:${NC}"
-    echo "  1) Cài package + shell và áp dụng cấu hình"
-    echo "  2) Chỉ stow configs (zsh, nvim, hypr, fcitx5)"
-    echo "  3) Chỉ patch deprecated dispatchers"
-    echo "  4) Chỉ cài package và thành phần shell"
-    echo "  5) Thoát"
-    echo ""
-    read -rp "$(echo -e "${CYAN}Lựa chọn [1-5]:${NC} ")" choice
-
-    if [[ "$choice" == 5 ]]; then info "Thoát."; exit 0; fi
+    if (( $# )); then
+        error "Không hỗ trợ tham số: chạy ./setup.sh để cài toàn bộ."
+        exit 2
+    fi
     preflight_checks
-
-    case "$choice" in
-        1)
-            install_extra_pkgs
-            install_zsh_assets
-            stow_configs
-            ;;
-        2)
-            command -v stow >/dev/null || { error "Chưa có stow; chọn mục 1 hoặc cài stow trước."; exit 1; }
-            stow_configs
-            ;;
-        3)
-            patch_deprecations
-            ;;
-        4)
-            install_extra_pkgs
-            install_zsh_assets
-            ;;
-        5)
-            info "Thoát."
-            exit 0
-            ;;
-        *)
-            error "Lựa chọn không hợp lệ"
-            exit 1
-            ;;
-    esac
+    install_extra_pkgs
+    install_flatpaks
+    install_zsh_assets
+    stow_configs
 
     echo ""
     echo -e "${GREEN}${BOLD}╔══════════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}${BOLD}║   ✅ Hoàn tất! Đăng xuất & đăng nhập lại.  ║${NC}"
     echo -e "${GREEN}${BOLD}╚══════════════════════════════════════════════╝${NC}"
     echo ""
-    if [[ "$choice" == 1 || "$choice" == 2 ]]; then
-        echo -e "  Các cấu hình đã áp dụng: ${STOW_PACKAGES[*]}"
-    fi
+    echo -e "  Các cấu hình đã áp dụng: ${STOW_PACKAGES[*]}"
     echo ""
 }
 

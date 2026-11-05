@@ -59,4 +59,6 @@ Kiểm tra nguồn HDMI, dây và adapter; sau đó chạy `hyprctl monitors all
 
 Đổi chế độ GPU có thể yêu cầu khởi động lại và tạo lại initramfs. Trước khi đổi, kiểm tra dung lượng `/boot`, có bản sao và USB khôi phục; xem [checklist cài lại](reinstall.md). Nếu lệnh đổi chế độ báo lỗi tạo initramfs, xử lý lỗi trước khi reboot.
 
+Các liên kết sau là tài liệu phiên bản 0.54.0, không phải xác nhận tương thích với mọi phiên bản mới. Trên máy hiện tại Hyprland 0.56.2 không báo lỗi qua `hyprctl configerrors`; sau cập nhật cần kiểm tra lại lệnh này và thử cả hai chế độ màn hình.
+
 Tham khảo [Hyprland: cấu hình màn hình](https://wiki.hypr.land/0.54.0/Configuring/Monitors/) và [hyprctl](https://wiki.hypr.land/0.54.0/Configuring/Using-hyprctl/).

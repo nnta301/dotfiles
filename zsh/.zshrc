@@ -51,7 +51,8 @@ alias teams='(/usr/bin/google-chrome-stable --profile-directory=Default --app-id
 alias thunar='(thunar > /dev/null 2>&1 &)'
 alias idea='(idea > /dev/null 2>&1 &)'
 alias outlook='(/usr/bin/google-chrome-stable --profile-directory=Default --app-id=faolnafnngnfdaknnbpnkhgohbobgegn > /dev/null 2>&1 &)'
-alias onedrive='(/usr/bin/google-chrome-stable --profile-directory=Default --app-id=pggjokkjodepmjbddgblmfheclnpjmod > /dev/null 2>&1 &)'
+# Keep `onedrive` available for the native sync client.
+alias onedrive-web='(/usr/bin/google-chrome-stable --profile-directory=Default --app-id=pggjokkjodepmjbddgblmfheclnpjmod > /dev/null 2>&1 &)'
 alias obs='(obs > /dev/null 2>&1 &)'
 alias dbeaver='(dbeaver > /dev/null 2>&1 &)'
 alias postman='(postman > /dev/null 2>&1 &)'

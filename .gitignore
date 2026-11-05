@@ -61,3 +61,10 @@ hyprland.lock
 # Keep lazy-lock.json in version control to restore the current plugin revisions.
 # .neoconf.json is project-local LSP config, not global
 nvim/.config/nvim/.neoconf.json
+
+# Personal backups must never be committed
+arch-backup-*/
+.restore-backup-*/
+home.tar
+etc.tar
+efi-truoc-cai-lai.tar

@@ -6,7 +6,9 @@ Hướng dẫn này dành cho người mới muốn **giữ Windows và cài Arc
 
 Lộ trình hỗ trợ Windows đã cài trên máy x86-64 ở chế độ **UEFI/GPT**, một EFI System Partition (ESP) hiện có của Windows trên cùng ổ, và Arch trên một phân vùng ext4 riêng: tạo mới từ vùng trống hoặc cài lại vào phân vùng Arch cũ đã xác định chắc chắn. Dùng GRUB trong ESP hiện có, kernel/initramfs trên phân vùng ext4 của Arch, NetworkManager, không tạo swap, không mã hóa Arch, không hibernate Linux, không RAID/LVM, tắt Secure Boot. Muốn cấu hình khác cần một lộ trình riêng.
 
-**Không format, xóa hoặc thay đổi kích thước ESP, phân vùng Windows, Recovery, Microsoft Reserved hay các phân vùng dữ liệu khác.** Thao tác phân vùng luôn có nguy cơ mất dữ liệu nếu chọn nhầm. Nếu có nhiều ESP, nhiều ổ giống nhau, Windows dùng Legacy/MBR, RAID/Intel RST, không xác định được ESP hay vùng trống, dừng và nhờ hỗ trợ; không đoán theo tên `/dev/...`.
+**Không format/xóa ESP, Windows, Recovery, Microsoft Reserved hay phân vùng dữ liệu khác; không thay đổi kích thước ESP/Recovery/MSR.** Chỉ thu nhỏ Windows theo mục 0.1; nếu muốn mở rộng Windows bằng vùng Arch cũ, dùng nhánh [chia lại dung lượng](repartition-arch.md) theo điều kiện riêng. Thao tác phân vùng luôn có nguy cơ mất dữ liệu nếu chọn nhầm. Nếu có nhiều ESP, nhiều ổ giống nhau, Windows dùng Legacy/MBR, RAID/Intel RST, không xác định được ESP hay vùng trống, dừng và nhờ hỗ trợ; không đoán theo tên `/dev/...`.
+
+**Đang dùng Arch và chuẩn bị cài lại?** Làm trước [checklist thao tác trên Arch cũ](reinstall.md), từ cấu hình backup OneDrive đến kiểm tra USB. Xong checklist mới quay lại các bước phân vùng bên dưới.
 
 Nếu máy đã có Arch và định cài lại, bạn có thể dùng lại phân vùng root cũ theo nhánh riêng ở mục 4; thao tác format sẽ xóa Arch và mọi dữ liệu trên phân vùng đó. Ảnh chụp ở [reinstall.md](reinstall.md) cho thấy máy này từng có nhiều phân vùng Windows/BitLocker và Arch: phải kiểm tra lại trạng thái thực tế.
 
@@ -47,28 +49,13 @@ Nếu định **cài lại vào root Arch cũ**, sau khi đã ghi nhận root v�
 
 ## 0.2. Sao lưu EFI trước khi cài lại Arch cũ
 
-**Nơi thực hiện: terminal trong Arch cũ, trước khi khởi động USB.** Mục này dành cho trường hợp EFI hiện đang gắn tại `/boot` và bạn định cài lại Arch theo Cách A ở mục 4. Việc xóa file boot Arch sau đó sẽ khiến Arch cũ không khởi động được cho đến khi cài lại thành công. Không áp dụng cho máy có sơ đồ boot khác.
+**Nơi thực hiện ban đầu: Arch cũ.** Dùng `./scripts/backup.sh` theo [reinstall.md](reinstall.md): script mã hóa và gửi EFI, cấu hình hệ thống, repo và dữ liệu lên OneDrive. Sau khi có thông báo hoàn tất, kiểm tra bằng `restore.sh <remote-id> --dry-run`. Không cần tự tạo tar EFI trên ổ ngoài.
 
-1. Sao lưu dữ liệu cá nhân và repo ra ổ ngoài, kiểm tra bản sao; lưu BitLocker recovery key và tạo USB Arch riêng. Thử boot USB và xác nhận có mạng. Kiểm tra Windows còn khởi động được, rồi tắt Windows hoàn toàn như mục 0.1.
-2. Trong Arch cũ, cắm **một ổ sao lưu riêng**, không phải ổ cài lại hoặc USB cài Arch. Xác định điểm gắn của ổ sao lưu bằng `lsblk -f` và `findmnt -T /duong-dan/den/o-sao-luu`. Ví dụ `/run/media/an/SAOLUU` chỉ là ví dụ: phải thay bằng đường dẫn thật và kiểm tra `SOURCE` thuộc ổ ngoài. Ổ phải có đủ dung lượng và cho phép ghi. Không lưu bản duy nhất trong `~`, OneDrive trên ổ cài lại, hoặc trên chính EFI.
-3. Kiểm tra EFI và boot Arch đang dùng:
+Trước khi xóa Arch, giữ mật khẩu/salt crypt, thông tin đăng nhập và BitLocker recovery key ngoài máy. Boot thử USB, có mạng và thử tải lại archive hệ thống theo [hướng dẫn export từ cloud](backup-restore.md#4-lấy-báo-cáo-và-efi-trước-khi-phân-vùng). Lệnh export tạo `efi.tar`, `etc.tar`, `repo.tar`, `metadata.tar` trong thư mục mới như `/tmp/arch-rescue`; không tự phục hồi chúng vào hệ thống.
 
-   ```bash
-   findmnt -no SOURCE,FSTYPE,TARGET /boot
-   cat /proc/cmdline
-   ls -lh /boot/vmlinuz-linux /boot/initramfs-linux.img /boot/intel-ucode.img
-   ```
+Trong USB, mở báo cáo từ `metadata.tar` ở thư mục tạm riêng để đối chiếu root/ESP. Mục 4.1 dùng `/tmp/arch-rescue/efi.tar` làm ví dụ: phải thay nếu export ở nơi khác. Dữ liệu `/tmp` mất sau reboot, nhưng bản gốc trên cloud vẫn phải được giữ; nếu reboot USB thì tải lại trước thao tác xóa.
 
-   Ghi lại UUID/PARTUUID của EFI và root cùng kết quả. Trên máy được kiểm tra, `/boot` là EFI FAT, boot dùng `vmlinuz-linux` và ba file trên có mặt; nếu máy bạn khác, dừng và xác định lại thay vì áp dụng bước xóa mẫu.
-4. Tạo bản sao toàn bộ EFI. Trong lệnh dưới, thay đường dẫn giữa dấu nháy bằng **file mới trên ổ sao lưu thật**; không chọn file đã tồn tại. Không sao chép nguyên ví dụ nếu ổ của bạn có tên khác:
-
-   ```bash
-   sudo tar -C /boot -cpf "/run/media/an/SAOLUU/efi-truoc-cai-lai.tar" .
-   sudo tar -tf "/run/media/an/SAOLUU/efi-truoc-cai-lai.tar"
-   sudo tar -C /boot -df "/run/media/an/SAOLUU/efi-truoc-cai-lai.tar"
-   ```
-
-   Lệnh đầu tạo bản sao; lệnh thứ hai liệt kê nội dung; lệnh thứ ba so sánh với EFI đang gắn. Kiểm tra có `./EFI/Microsoft/Boot/bootmgfw.efi` và các file boot Arch, không có lỗi hay khác biệt. Nếu có lỗi hoặc file thay đổi trong lúc sao lưu, dừng và tạo bản sao mới sau khi xác định nguyên nhân. Thử đọc bản sao trên thiết bị khác nếu có thể; ghi lại đường dẫn và giữ ổ sao lưu an toàn. Không đưa nội dung sao lưu hoặc recovery key lên Git. [GNU tar: so sánh archive](https://www.gnu.org/software/tar/manual/html_node/compare.html).
+Mục 4.1 chỉ áp dụng cho bố cục cũ `/boot` là ESP FAT chứa `vmlinuz-linux`, `initramfs-linux.img`, `intel-ucode.img`. Báo cáo mount/cmdline trong backup và file thực tế phải khớp. Không truy cập được cloud, không có khóa hoặc không đối chiếu được thì dừng trước khi xóa/format. Backup cloud không thay thế việc xác minh đúng thiết bị.
 
 ## 1. Tải ISO và kiểm tra trên Windows
 
@@ -162,21 +149,14 @@ umount /mnt/esp-check
    ```
 
    Xác nhận đúng ESP FAT32, tùy chọn có `ro`, các file khớp với kết quả mục 0.2 và còn Windows Boot Manager. Nếu thiếu hoặc khác, dừng.
-2. Cắm ổ sao lưu ngoài và xác định phân vùng của nó bằng `lsblk -o NAME,SIZE,MODEL,FSTYPE,LABEL,MOUNTPOINTS`. Chẳng hạn, **nếu** đã xác minh phân vùng ổ sao lưu là `/dev/sdb1`, mount chỉ đọc như sau; thay tên theo máy bạn, không đoán hoặc chọn ổ Arch/USB cài:
+2. Tải lại archive hệ thống từ OneDrive bằng quy trình [export trong USB](backup-restore.md#4-lấy-báo-cáo-và-efi-trước-khi-phân-vùng), vào thư mục mới `/tmp/arch-rescue` trong ví dụ. Chỉ tiếp tục khi lệnh xác minh/tải thành công. Đối chiếu archive EFI với ESP đang mount chỉ đọc:
 
    ```bash
-   mount --mkdir -o ro /dev/sdb1 /mnt/backup
-   findmnt -no SOURCE,FSTYPE,OPTIONS /mnt/backup
+   tar -tf /tmp/arch-rescue/efi.tar
+   tar -C /mnt/esp-check -df /tmp/arch-rescue/efi.tar
    ```
 
-   Nếu mount thất bại, dừng. Xác nhận `SOURCE` đúng ổ sao lưu độc lập và tùy chọn có `ro`. Ví dụ dưới giả sử archive nằm ở gốc ổ sao lưu với tên như mục 0.2; thay đường dẫn cho đúng:
-
-   ```bash
-   tar -tf /mnt/backup/efi-truoc-cai-lai.tar
-   tar -C /mnt/esp-check -df /mnt/backup/efi-truoc-cai-lai.tar
-   ```
-
-   Kiểm tra nội dung có Windows Boot Manager và ba file Arch; nếu đọc lỗi hoặc so sánh báo khác biệt, **dừng**, không xóa gì. Sau khi đối chiếu, chạy `umount /mnt/backup`, tháo ổ sao lưu an toàn và giữ lại đến khi cả hai hệ điều hành hoạt động. `tar -d` so sánh nội dung archive với file hiện tại; để chắc chắn khả năng khôi phục, cũng cần thử đọc bản sao trên thiết bị khác.
+   Kiểm tra có Windows Boot Manager và ba file boot Arch đã xác định; đọc lỗi hoặc so sánh khác biệt thì **dừng**, không xóa gì. Giữ bản gốc trên OneDrive và khóa giải mã đến khi cả hai hệ điều hành hoạt động. Nếu dùng bản backup ngoài máy khác, thay đúng đường dẫn đã kiểm tra; không mặc định một file tên giống là bản hợp lệ.
 3. **Điểm không thể quay lại ngay:** chỉ khi đã sao lưu, xác nhận đúng EFI và chấp nhận Arch cũ sẽ không boot, tháo EFI chỉ đọc rồi mount lại đọc/ghi:
 
    ```bash
@@ -202,11 +182,13 @@ umount /mnt/esp-check
    umount /mnt/esp-check
    ```
 
-   Tiếp tục **Cách A** dưới đây. Sau khi format root cũ và mount EFI tại `/mnt/efi`, kernel và `/boot/grub` mới sẽ được tạo trên ext4 của Arch; EFI giữ các file khởi động UEFI. Kiểm tra cả Arch và Windows ở mục 7 trước khi bỏ bản sao.
+   Tiếp tục **Cách A** dưới đây nếu giữ phân vùng root cũ; nếu xóa rồi chia lại, làm **Cách C**. Sau khi format root cũ và mount EFI tại `/mnt/efi`, kernel và `/boot/grub` mới sẽ được tạo trên ext4 của Arch; EFI giữ các file khởi động UEFI. Kiểm tra cả Arch và Windows ở mục 7 trước khi bỏ bản sao.
 
-### Chọn một trong hai cách chuẩn bị phân vùng Arch
+### Chọn một trong ba cách chuẩn bị phân vùng Arch
 
-**Cách A — cài lại trên phân vùng Arch cũ:** Chỉ áp dụng nếu đã lưu bản sao độc lập và ghi root UUID/PARTUUID từ Arch đang chạy ở mục 0. Đối chiếu `lsblk` với UUID, PARTUUID, model ổ, kích thước và loại `ext4`; kiểm tra đây là phân vùng root cũ, không phải ESP, Windows, phân vùng dữ liệu hay một phân vùng Linux khác. Nếu thiếu bất kỳ thông tin nào hoặc không khớp, dừng. Ghi lại tên thiết bị đúng ở phiên USB, ví dụ `/dev/nvme0n1p6`, rồi **bỏ qua Cách B**, đến bước format bên dưới. Format sẽ xóa toàn bộ root cũ, bao gồm `/home` nếu chung root.
+**Cách A — cài lại trên phân vùng Arch cũ:** Chỉ áp dụng nếu đã lưu bản sao độc lập và ghi root UUID/PARTUUID từ Arch đang chạy ở mục 0. Đối chiếu `lsblk` với UUID, PARTUUID, model ổ, kích thước và loại `ext4`; kiểm tra đây là phân vùng root cũ, không phải ESP, Windows, phân vùng dữ liệu hay một phân vùng Linux khác. Nếu thiếu bất kỳ thông tin nào hoặc không khớp, dừng. Ghi lại tên thiết bị đúng ở phiên USB, ví dụ `/dev/nvme0n1p6`, rồi **bỏ qua Cách B và C**, đến bước format bên dưới. Format sẽ xóa toàn bộ root cũ, bao gồm `/home` nếu chung root.
+
+**Cách C — xóa root Arch cũ rồi chia lại dung lượng:** Làm [hướng dẫn repartition](repartition-arch.md), gồm backup, kiểm tra Windows Boot Manager, xóa đúng root từ USB và tạo root mới. Không áp dụng Cách A rồi xóa tiếp. Sau khi hoàn tất tạo root mới, quay lại đoạn format/mount dưới đây; không làm lại Cách B.
 
 **Cách B — tạo phân vùng Arch mới trong vùng Unallocated:**
 
@@ -228,7 +210,7 @@ Kiểm tra lại bằng:
 lsblk -o NAME,SIZE,TYPE,FSTYPE,PARTLABEL,PARTUUID
 ```
 
-Sau Cách A hoặc B, ví dụ nếu phân vùng Arch đã xác định là `/dev/nvme0n1p9`, chỉ format **phân vùng Arch đã chọn và đối chiếu**; không sao chép số `p9` một cách máy móc. Lệnh này xóa dữ liệu trên phân vùng được chỉ định:
+**Format và mount sau Cách A/B/C:** ví dụ nếu phân vùng Arch đã xác định là `/dev/nvme0n1p9`, chỉ format **phân vùng Arch đã chọn và đối chiếu**; không sao chép số `p9` một cách máy móc. Lệnh này xóa dữ liệu trên phân vùng được chỉ định:
 
 ```bash
 mkfs.ext4 /dev/nvme0n1p9
@@ -392,7 +374,7 @@ Nếu `sudo -v` thất bại, kiểm tra cấu hình wheel bằng tài khoản r
 
 ```bash
 sudo pacman -Syu
-sudo pacman -S --needed git stow nano
+sudo pacman -S --needed git nano
 sudo reboot
 ```
 
@@ -400,27 +382,33 @@ sudo reboot
 
 ## 9. Cài nền JaKooLit/Hyprland
 
-**Nơi thực hiện: Arch mới, đăng nhập tài khoản thường; không chạy script bằng root hoặc `sudo ./install.sh`.** JaKooLit (không phải “jakoolist”) là tác giả bộ cài Hyprland. Bộ cài Arch-Hyprland cài ứng dụng và, nếu chọn, tải dotfiles Hyprland từ dự án khác. Repo hiện tại là lớp cấu hình cá nhân đặt lên nền đó, không phải trình cài Arch hay Hyprland hoàn chỉnh.
+**Nơi thực hiện: Arch mới, đăng nhập tài khoản thường; không chạy script bằng root hoặc `sudo ./install.sh`.** JaKooLit là tác giả bộ cài Hyprland. Bộ cài Arch-Hyprland cài ứng dụng và, nếu chọn, tải dotfiles Hyprland từ dự án khác. Repo hiện tại là lớp cấu hình cá nhân đặt lên nền đó, không phải trình cài Arch hay Hyprland hoàn chỉnh.
 
 Repo hiện đang trỏ đến [JaKooLit/Arch-Hyprland](https://github.com/JaKooLit/Arch-Hyprland). Upstream thông báo dự án chuyển bảo trì sang [LinuxBeginnings](https://github.com/LinuxBeginnings/Arch-Hyprland); các phiên bản/config mới có thể khác repo này. Vì chưa kiểm thử kết hợp mới, lộ trình sau dùng URL repo hiện tại và **không đảm bảo tương thích với bản Arch/Hyprland mới**. Nếu upstream báo không còn hỗ trợ hoặc script thất bại, dừng, đọc thông báo và kiểm tra tài liệu upstream; không tự đổi sang fork rồi giả định tương thích.
 
-```bash
-git clone --depth=1 https://github.com/JaKooLit/Arch-Hyprland.git ~/JaKooLit-Arch
-cd ~/JaKooLit-Arch
-chmod +x install.sh
-./install.sh
-```
-
-Đọc các câu hỏi của installer; dùng phím mũi tên, Space để chọn/bỏ chọn và Enter để xác nhận. Chọn cài **pre-configured KooL Hyprland dotfiles** (`dots`) vì repo này cần cấu hình nền; chọn **SDDM** nếu chưa có trình đăng nhập đồ họa, **Zsh with Oh-My-Zsh**, và **yay** nếu được hỏi AUR helper. Các lựa chọn có thể đổi tên. Chỉ chọn driver NVIDIA sau khi đã xác định GPU và xem hướng dẫn tương thích của upstream; không chọn tùy tiện. Installer dùng `sudo`, có thể tải nhiều package và thay đổi audio/config. Nếu lỗi, ghi lại lỗi và dừng.
-
-Khởi động lại theo hướng dẫn installer, chọn phiên Hyprland tại màn hình đăng nhập và đăng nhập. Xác nhận desktop, bàn phím, mạng và terminal hoạt động **trước khi áp overlay**. Nếu không vào được, xem mục 12.
-
-## 10. Cài công cụ và áp dụng repo này
-
-**Nơi thực hiện: terminal của Arch, đăng nhập bằng tài khoản thường.** Sau khi nền JaKooLit đã hoạt động, clone repo (nếu khôi phục thay đổi riêng, dùng bản đã commit/push hoặc bản sao đã kiểm tra):
+Clone repo cá nhân và chạy setup (cần Git, mạng, sudo; `git` đã được cài ở mục 8):
 
 ```bash
 git clone https://github.com/nnta301/dotfiles.git ~/dotfiles
+cd ~/dotfiles
+./setup.sh
+```
+
+`setup.sh` có một luồng cài toàn bộ, không có menu chọn nhóm package. Nếu chưa có `~/.config/hypr/hyprland.conf`, script tải và chạy installer JaKooLit trước. Script in đường dẫn installer và log dưới `~/.cache/jakoolit-install.*/Arch-Hyprland`.
+
+Nếu đã có file, script **bỏ qua installer JaKooLit và tiếp tục cài ngay**; chỉ nên chạy khi đã xác nhận đó là cấu hình JaKooLit đang hoạt động. Khi setup đã cài package và áp dụng cấu hình thành công, không cần chạy lại ở mục 10; chuyển đến phần nhóm tùy chọn hoặc mục 11.
+
+Đọc các câu hỏi của installer; dùng phím mũi tên, Space để chọn/bỏ chọn và Enter để xác nhận. Chọn **pre-configured KooL Hyprland dotfiles** (`dots`) vì repo này cần cấu hình nền. Installer JaKooLit cũng có tùy chọn cài và cấu hình trình đăng nhập **SDDM**: nếu Arch mới chưa có trình đăng nhập đồ họa, chọn `sddm` ngay trong menu JaKooLit; không cần cài riêng ở bước khác. Tùy chọn `sddm_theme` là theme bổ sung, có thể chọn nếu muốn. Nếu đã dùng trình đăng nhập khác, xem thông báo của installer trước khi thay đổi; lựa chọn SDDM có thể không được hiện.
+
+Bạn cũng có thể chọn **Zsh with Oh-My-Zsh** và chọn **yay** nếu được hỏi AUR helper. Tên các lựa chọn có thể thay đổi. Với máy hiện tại (RTX 2060 Mobile, kernel `linux`), chọn `nvidia`. Trước khi chạy installer, setup đổi gói `nvidia-dkms` trong bản installer vừa tải thành `nvidia-open`, khớp `pkglist.txt`, và giữ các bước cấu hình NVIDIA của upstream. Nếu cấu trúc danh sách driver upstream thay đổi, setup dừng để kiểm tra. Đây là lựa chọn dành cho máy này; không áp dụng nguyên trạng cho GPU/kernel khác. Installer dùng `sudo`, có thể tải nhiều package và thay đổi audio/config. Nếu lỗi, ghi lại lỗi và dừng.
+
+Nếu setup vừa chạy installer JaKooLit và installer tạo được `hyprland.conf`, setup **dừng sau khi cài nền**, chưa cài package cá nhân hay áp dụng cấu hình của repo. Vì vậy cần đăng nhập và kiểm tra Hyprland, rồi tiếp tục mục 10. Nếu báo không tạo được file hoặc installer lỗi, đọc thông báo và log trong thư mục được in ra; kiểm tra đã chọn `dots`, sau đó xử lý lỗi và chạy lại setup. Khởi động lại theo hướng dẫn installer, chọn phiên Hyprland tại màn hình đăng nhập và đăng nhập. Xác nhận desktop, bàn phím, mạng và terminal hoạt động. Nếu không vào được, xem mục 12.
+
+## 10. Cài công cụ và áp dụng repo này
+
+**Chỉ làm bước chạy setup dưới đây nếu setup đã dừng sau khi cài nền JaKooLit ở mục 9.** Nếu nó đã hoàn tất cài package và áp dụng cấu hình ở mục 9, bỏ qua lần chạy này. Sau khi nền JaKooLit đã hoạt động, mở terminal trong Arch bằng tài khoản thường và dùng lại repo đã clone:
+
+```bash
 cd ~/dotfiles
 ```
 
@@ -432,9 +420,9 @@ Repo có cấu hình màn hình laptop `eDP-1`. Xem tên màn hình bằng `hypr
 
 Trước khi chạy, đọc `pkglist.txt`: danh sách có `nvidia-open`, `intel-ucode`, kernel và bootloader của máy cũ. Xóa hoặc comment các gói không phù hợp với phần cứng; nếu JaKooLit đã cài driver NVIDIA khác như `nvidia-dkms`, kiểm tra tương thích và giải quyết xung đột driver trước khi cài. Không xác nhận thay thế driver khi chưa hiểu tác động.
 
-Chọn **1**. Script cập nhật hệ thống, cài package chính thức trong `pkglist.txt` bằng Pacman và các dòng `aur/` bằng yay, chuẩn bị Oh My Zsh, hai plugin và theme nếu thiếu, sau đó áp dụng cấu hình `zsh`, `nvim`, `hypr`, `fcitx5` qua Stow. Cần mạng và quyền `sudo`; nếu cài package chính thức, AUR hoặc tải thành phần shell thất bại, script dừng trước khi Stow. Nếu chưa có yay, script tải PKGBUILD yay và dừng để bạn kiểm tra trước khi build. Các gói AUR do cộng đồng duy trì: đọc PKGBUILD và phản hồi các câu hỏi của yay; tên gói có thể thay đổi hoặc build thất bại, khi đó sửa danh sách/lỗi rồi chạy lại.
+Script cập nhật hệ thống, cài toàn bộ package chính thức trong `pkglist.txt` bằng Pacman và kiểm tra rồi cài các dòng `aur/` bằng yay. Script cũng cài các ứng dụng Flatpak trong `packages/flatpak-apps.txt` từ Flathub cho người dùng hiện tại. Sau đó script chuẩn bị Oh My Zsh, hai plugin và theme nếu thiếu, rồi áp dụng cấu hình `zsh`, `nvim`, `hypr`, `fcitx5` qua Stow. Cần mạng và quyền `sudo`; nếu cài package hoặc tải thành phần shell thất bại, script dừng trước khi Stow. Nếu chưa có yay và danh sách có AUR, script tải PKGBUILD yay và dừng để bạn kiểm tra trước khi build. Các gói AUR do cộng đồng duy trì: đọc PKGBUILD và phản hồi các câu hỏi của yay; tên gói có thể thay đổi hoặc build thất bại, khi đó sửa danh sách/lỗi rồi chạy lại.
 
-Script chuyển file trùng và cả `UserConfigs` cũ vào `~/.dotfiles-backup.*`; có thể dừng giữa chừng nếu còn xung đột. Ghi lại đường dẫn backup. Chọn **2** nếu bạn chỉ muốn Stow và đã tự chuẩn bị công cụ; chọn **4** chỉ cài package và thành phần shell. Không dùng `stow --adopt` hay `git checkout` để xử lý xung đột khi chưa hiểu hậu quả. Menu **3** là bước vá cũ, chỉ dùng sau khi kiểm tra lỗi và upstream.
+Script chuyển file trùng và cả `UserConfigs` cũ vào `~/.dotfiles-backup.*`; có thể dừng giữa chừng nếu còn xung đột. Ghi lại đường dẫn backup. Trước khi cập nhật, script dừng nếu `/boot` là EFI FAT và còn dưới 32 MiB; xem mục 0.2 và 4.1 để chuẩn bị khi cài lại. Không dùng `stow --adopt` hay `git checkout` để xử lý xung đột khi chưa hiểu hậu quả.
 
 ### Các nhóm tùy chọn
 
@@ -491,9 +479,9 @@ hyprctl keyword monitor "HDMI-A-3,preferred,auto,1"
 hyprctl keyword monitor "eDP-1,disable"
 ```
 
-Trước khi rút HDMI, bật lại laptop bằng `hyprctl keyword monitor "eDP-1,preferred,auto,1"` và xác nhận đã có hình. Các lệnh thay đổi tạm thời; xem [hướng dẫn màn hình ngoài](man-hinh-ngoai.md) để chọn độ phân giải, khôi phục cấu hình và xử lý lỗi.
+Trước khi rút HDMI, bật lại laptop bằng `hyprctl keyword monitor "eDP-1,preferred,auto,1"` và xác nhận đã có hình. Các lệnh thay đổi tạm thời; xem [hướng dẫn màn hình ngoài](external-displays.md) để chọn độ phân giải, khôi phục cấu hình và xử lý lỗi.
 
-Danh sách `packages/` chỉ là ảnh chụp package của máy cũ; không tự động cài tất cả. Xem [reinstall.md](reinstall.md) và đối chiếu nhu cầu, driver, nguồn package trước khi cài thêm. Giữ bản sao dữ liệu cũ đến khi xác nhận khôi phục đầy đủ.
+`packages/explicit-repo.txt`, `explicit-foreign.txt` và `all-foreign.txt` là snapshot để đối chiếu. Riêng `packages/flatpak-apps.txt` được setup dùng để cài ứng dụng Flatpak; `pkglist.txt` quyết định gói Pacman/AUR. Xem [reinstall.md](reinstall.md) và đối chiếu nhu cầu, driver, nguồn package trước khi cài thêm. Giữ bản sao dữ liệu cũ đến khi xác nhận khôi phục đầy đủ.
 
 ## 12. Xử lý lỗi thường gặp
 

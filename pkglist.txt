@@ -1,6 +1,6 @@
 # Các dòng không có # được setup.sh cài; tiền tố aur/ chọn nguồn AUR.
 # Xóa hoặc thêm # đầu dòng nếu không muốn cài gói đó.
-# Các mục Flatpak ở cuối chỉ để xem xét, chưa được tự động cài.
+# Chạy setup.sh để cài toàn bộ các mục không bị comment.
 # Firefox được giữ lại; Brave không nằm trong danh sách.
 
 # Cấu hình shell, editor và bộ gõ
@@ -27,7 +27,7 @@ eza
 # Ứng dụng đồ họa và giải trí
 discord
 dbeaver
-intellij-idea-community-edition
+intellij-idea-oss
 libreoffice-fresh
 gimp
 gedit
@@ -139,6 +139,67 @@ ufw
 woff2-font-awesome
 wofi
 
+# Những package cài chủ động còn lại trong snapshot máy cũ.
+adobe-source-code-pro-fonts
+bc
+bluez
+bluez-utils
+brightnessctl
+cava
+cliphist
+ffmpegthumbnailer
+grim
+gvfs
+gvfs-mtp
+hypridle
+hyprland
+hyprlock
+hyprpolkitagent
+jq
+kitty
+kvantum
+libspng
+linux-headers
+nano
+network-manager-applet
+noto-fonts
+noto-fonts-emoji
+nvidia-utils
+nwg-displays
+nwg-look
+otf-font-awesome
+pamixer
+pavucontrol
+pipewire
+pipewire-alsa
+pipewire-pulse
+qt5-quickcontrols2
+qt5ct
+qt6-5compat
+qt6-virtualkeyboard
+qt6ct
+quickshell
+rofi
+sddm
+slurp
+sof-firmware
+swappy
+swaync
+ttf-droid
+ttf-fantasque-nerd
+ttf-fira-code
+ttf-jetbrains-mono
+ttf-jetbrains-mono-nerd
+tumbler
+umockdev
+waybar
+wireplumber
+wl-clipboard
+xdg-desktop-portal-hyprland
+xdg-user-dirs
+yad
+zsh-completions
+
 # AUR: setup.sh dùng yay, xây dựng với tài khoản thường.
 aur/google-chrome
 aur/antigravity-ide
@@ -164,7 +225,4 @@ aur/wlogout
 aur/yay
 aur/zsh-theme-powerlevel10k-git
 
-# Flatpak đã cài: chỉ tham khảo, setup.sh chưa cài.
-# com.github.rafostar.Clapper
-# io.github.flattool.Warehouse
-# io.github.spacingbat3.webcord
+# Ứng dụng Flatpak được cài từ packages/flatpak-apps.txt.

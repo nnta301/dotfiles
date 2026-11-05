@@ -1,150 +1,79 @@
-# 📋 Manual Steps — Sau khi chạy `setup.sh`
+# Sau setup: dữ liệu, tài khoản và kiểm tra ứng dụng
 
-Những việc **không thể tự động hóa** và cần làm thủ công sau khi setup xong.
+Đối chiếu với script ngày 05/11/2026. `setup.sh` đã cài package, Flatpak, Oh My Zsh, plugins, theme, font trong danh sách và áp dụng cấu hình bằng Stow. Không cần cài lại từng thành phần đó bằng các lệnh riêng.
 
----
+## 1. Phục hồi dữ liệu trước khi bật đồng bộ
 
-## 1. Đăng nhập & xác thực tài khoản
+Làm phần restore trong [reinstall.md](reinstall.md): xem trước bằng `restore.sh --dry-run`, sau đó dùng `--apply`. Cấu hình ẩn cần chọn riêng bằng `--include`; không chép đè cả home hay `/etc` lên hệ thống mới. Xem [backup/restore](backup-restore.md) về backup file bị thay thế và các giới hạn.
 
-### GitHub / Git
+## 2. Git và SSH
+
+Kiểm tra danh tính Git hiện có:
+
 ```bash
-# Cấu hình thông tin cơ bản
-git config --global user.name "Tên của bạn"
-git config --global user.email "email@example.com"
-
-# Tạo SSH key và thêm vào GitHub
-ssh-keygen -t ed25519 -C "email@example.com"
-cat ~/.ssh/id_ed25519.pub   # Copy và paste vào GitHub → Settings → SSH Keys
+git config --global user.name
+git config --global user.email
 ```
 
-### OneDrive
+Nếu trống hoặc muốn đổi, đặt tên/email thật:
 
-Máy cũ có `onedrive-abraunegg` và đã bật `onedrive.service` cho người dùng. Sau khi cài gói và đăng nhập lại bằng lệnh `onedrive`, bật lại dịch vụ nếu bạn muốn đồng bộ tự động:
+```bash
+git config --global user.name "Tên của bạn"
+git config --global user.email "email@example.com"
+```
+
+Nếu đã phục hồi `.ssh`, kiểm tra khóa cũ trước khi tạo mới. Chỉ khi muốn tạo khóa mới và chưa có file cùng tên, chạy `ssh-keygen -t ed25519 -C "email@example.com"`, thay email thật. Không xác nhận ghi đè khóa đang có. Chỉ đưa file **public key** `.pub` vào GitHub → Settings → SSH and GPG keys; không đưa private key vào repo.
+
+## 3. OneDrive và tài khoản ứng dụng
+
+Alias mở OneDrive trên Chrome tên là `onedrive-web`; lệnh `onedrive` bên dưới chạy client đồng bộ. Mở terminal mới sau khi áp cấu hình Zsh để nhận thay đổi alias.
+
+Sau khi đối chiếu dữ liệu local đã restore với dữ liệu trên web, xác thực OneDrive theo lời nhắc của client:
+
+```bash
+onedrive
+```
+
+Trước khi bật dịch vụ, loại `ArchBackups` khỏi phạm vi sync theo [hướng dẫn backup](backup-restore.md#onedrive-sync-sau-backup) để không tải bản backup về đầy ổ. Khi đã kiểm tra tài khoản và cấu hình đồng bộ đúng, bật dịch vụ:
 
 ```bash
 systemctl --user enable --now onedrive.service
 ```
 
-Máy cũng có `rclone`, nhưng chưa xác định được có dùng rclone để đồng bộ OneDrive hay không. Nếu bạn dùng rclone:
-```bash
-rclone config   # Làm theo hướng dẫn, chọn "Microsoft OneDrive"
-# Sau đó mount:
-rclone mount OneDrive: ~/OneDrive --daemon
-```
+Nếu đã có dịch vụ hoặc một tiến trình sync khác, kiểm tra trước để tránh chạy hai client cho cùng thư mục. Repo có rclone nhưng không tự thiết lập remote; không mount rclone đè lên `~/OneDrive` đang chứa dữ liệu của client OneDrive. Token không được push lên Git.
 
-Không đưa refresh token hoặc cấu hình xác thực lên Git. Xem `reinstall.md` để chuẩn bị bản sao dữ liệu trước khi cài lại.
+Đăng nhập Chrome, trình quản lý mật khẩu và các ứng dụng cần tài khoản; có thể cần 2FA. Kiểm tra extension sau khi đăng nhập/sync, cài lại phần còn thiếu từ nguồn chính thức. Không mặc định mọi extension đều thiếu hoặc không thể đồng bộ. Profile cũ không bảo đảm giữ phiên đăng nhập/mật khẩu.
 
----
+## 4. Shell và bộ gõ
 
-## 2. Cấp quyền & nhóm người dùng
-
-Xem [bước tạo tài khoản và các nhóm tùy chọn](cai-arch-tu-windows.md) trước khi thêm quyền. Nhóm `input` có thể đọc sự kiện bàn phím; nhóm `docker` cấp quyền tương đương root, nên chỉ thêm khi cần.
-
----
-
-## 3. Cài đặt Oh-My-Zsh
-
-Mục 1 hoặc 4 trong `setup.sh` sẽ chuẩn bị Oh My Zsh, plugin và theme. Nếu làm thủ công, trước tiên kiểm tra `~/.oh-my-zsh`: installer JaKooLit có thể đã cài sẵn. Chỉ chạy trình cài chính thức sau nếu chưa có Oh My Zsh; trình cài có thể thay đổi `.zshrc`, nên sao lưu cấu hình hiện tại trước:
+Setup chuẩn bị Oh My Zsh, theme và plugin; đăng xuất/đăng nhập lại sau khi áp cấu hình. Nếu muốn đổi shell đăng nhập sang Zsh:
 
 ```bash
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+chsh -s /bin/zsh
 ```
 
-Sau đó, chỉ clone plugin chưa có (lệnh sẽ lỗi nếu thư mục đích đã tồn tại):
-```bash
-# zsh-autosuggestions
-git clone https://github.com/zsh-users/zsh-autosuggestions \
-    ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
+Profile Fcitx5 trong repo đã có Keyboard US và Bamboo. Mở `fcitx5-configtool`, kiểm tra chúng xuất hiện và thử nhập tiếng Việt; không thêm bản trùng. Kiểm tra phím chuyển bộ gõ trong Global Options, không giả định luôn là Super+Space.
 
-# zsh-syntax-highlighting
-git clone https://github.com/zsh-users/zsh-syntax-highlighting \
-    ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
+## 5. Nhóm người dùng và dịch vụ
 
-# agnosterzak theme: clone rồi sao chép file theme theo hướng dẫn tác giả
-mkdir -p ~/.oh-my-zsh/custom/themes
-git clone https://github.com/zakaziko99/agnosterzak-ohmyzsh-theme \
-    ~/agnosterzak-ohmyzsh-theme
-cp ~/agnosterzak-ohmyzsh-theme/agnosterzak.zsh-theme ~/.oh-my-zsh/custom/themes/
-```
+Setup cài package không đồng nghĩa đã bật mọi dịch vụ. Xem [phần nhóm tùy chọn](arch-windows-dual-boot.md#các-nhóm-tùy-chọn) trước khi thêm `input` hoặc `docker`. Chỉ bật Docker/database khi cần và sau khi chuẩn bị dữ liệu tương ứng; không bật toàn bộ danh sách dịch vụ cũ từ báo cáo backup.
 
----
-
-## 4. Cài đặt font
+Với Bluetooth, kiểm tra dịch vụ trước khi ghép thiết bị:
 
 ```bash
-# Ví dụ một Nerd Font từ repo chính thức
-sudo pacman -S --needed ttf-jetbrains-mono-nerd
-
-# Refresh font cache
-fc-cache -fv
+systemctl is-active bluetooth.service
 ```
 
----
+Nếu muốn dùng Bluetooth và dịch vụ chưa chạy, dùng `sudo systemctl enable --now bluetooth.service`, rồi ghép thiết bị trong Blueman. Việc ghép đôi có thể cần làm lại trên hệ điều hành mới.
 
-## 5. Thiết lập màn hình (đã được xử lý bởi override)
+## 6. Màn hình và Neovim
 
-`LaptopDisplay.conf` trong repo đã thiết lập:
-```conf
-monitor = eDP-1, preferred, auto, 1
-```
+Xem [hướng dẫn màn hình ngoài](external-displays.md) cho hai chế độ mirror và chỉ màn hình ngoài. Xác định cổng thật bằng `hyprctl monitors`, không mặc định tên HDMI luôn giống máy cũ.
 
-Để chiếu giống laptop hoặc chỉ sử dụng màn hình ngoài, xem [hướng dẫn màn hình ngoài](man-hinh-ngoai.md). Tên cổng HDMI tùy thiết bị; kiểm tra bằng `hyprctl monitors`.
+Mở `nvim` và chờ trình quản lý plugin hoàn tất, đọc lỗi nếu có. Dùng `:Lazy` để xem trạng thái; kiểm tra các công cụ ngôn ngữ cần cho project bằng giao diện của cấu hình đang cài. Không chạy cập nhật tất cả plugin chỉ để kiểm tra phục hồi: repo đã giữ phiên bản trong `lazy-lock.json`.
 
----
+Giữ backup OneDrive và khóa giải mã ngoài máy cho đến khi đã kiểm tra tài liệu, code, bộ gõ, ứng dụng và cả Windows/Arch.
 
-## 6. Thiết lập Fcitx5 Bamboo (Vietnamese Input)
+## TeXpresso trong Neovim
 
-Sau khi stow và khởi động lại Hyprland:
-
-```bash
-# Mở Fcitx5 Configuration GUI
-fcitx5-configtool
-```
-
-1. Thêm "Bamboo" vào Input Method
-2. Đặt Bamboo làm input method thứ 2 (sau "Keyboard - English")
-3. Kiểm tra hoạt động: mở bất kỳ app nào, nhấn `SUPER + SPACE` để chuyển input
-
----
-
-## 7. Thiết lập Bluetooth
-
-```bash
-bluetoothctl
-# Trong bluetoothctl:
-#   power on
-#   scan on
-#   pair <MAC>
-#   connect <MAC>
-#   trust <MAC>
-```
-
----
-
-## 8. Cài extension cho trình duyệt (thủ công)
-
-Những extension **không thể sync tự động**:
-- [uBlock Origin](https://ublockorigin.com/)
-- [Bitwarden](https://bitwarden.com/)
-- [Vimium](https://vimium.github.io/)
-
----
-
-## 9. Neovim — First Launch
-
-Lần đầu mở Neovim sau khi stow:
-
-```bash
-nvim
-# LazyVim sẽ tự động cài plugins lần đầu
-# Chờ khoảng 1-2 phút cho đến khi hoàn tất
-```
-
-Cài LSP servers qua Mason:
-```
-:Mason   → tìm và cài các server cần thiết
-```
-
----
-
-*Cập nhật lần cuối: 2026-08-09*
+Plugin `texpresso.vim` trong repo cần chương trình `texpresso` riêng trong PATH. Máy được kiểm tra có `/usr/local/bin/texpresso`, nhưng file cài thủ công này không nằm trong `pkglist.txt` hoặc bản backup home. Sau cài lại, nếu dùng tính năng xem trước LaTeX này, kiểm tra `command -v texpresso` và cài theo [hướng dẫn upstream](https://github.com/let-def/texpresso). Chỉ cài plugin Neovim chưa đủ; các tính năng khác của Neovim vẫn dùng được.

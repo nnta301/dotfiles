@@ -16,7 +16,9 @@ git status
 git diff
 
 # Commit và push
-git add -A
+git add -p
+# Thêm riêng file mới đã kiểm tra bằng git add <đường-dẫn>
+git diff --cached
 git commit -m "feat: mô tả thay đổi"
 git push
 ```
@@ -26,15 +28,12 @@ git push
 > Xem [README.md](../README.md) để biết quy trình cài đặt và liên kết hướng dẫn chi tiết.
 
 ```bash
-# 1. Chạy JaKooLit upstream trước
-git clone --depth=1 https://github.com/JaKooLit/Arch-Hyprland.git ~/JaKooLit-Arch
-cd ~/JaKooLit-Arch && ./install.sh
-
-# 2. Clone repo cá nhân và áp dụng override
 git clone https://github.com/nnta301/dotfiles.git ~/dotfiles
 cd ~/dotfiles
-chmod +x setup.sh && ./setup.sh
+./setup.sh
 ```
+
+Khi thiếu cấu hình Hyprland, script chạy installer JaKooLit rồi dừng. Trong installer JaKooLit, chọn `dots` (và `nvidia`, `sddm` cho máy hiện tại khi chưa có display manager), đăng nhập và kiểm tra Hyprland, sau đó chạy lại `./setup.sh` để áp cấu hình cá nhân. Nếu đã có `hyprland.conf`, script tiếp tục ngay; kiểm tra trước đó là cấu hình JaKooLit hoạt động.
 
 ### Cập nhật snapshot package từ hệ thống hiện tại
 
@@ -47,24 +46,19 @@ pacman -Qqm > packages/all-foreign.txt
 
 ---
 
-## ⌨️ Phím tắt Hyprland (thường dùng)
+## ⌨️ Kiểm tra phím tắt Hyprland
 
-| Phím tắt | Hành động |
-|----------|-----------| 
-| `SUPER + Q` | Mở terminal (Kitty) |
-| `SUPER + C` | Đóng cửa sổ hiện tại |
-| `SUPER + R` | Mở app launcher |
-| `SUPER + E` | Mở file manager |
-| `SUPER + F` | Toggle fullscreen |
-| `SUPER + V` | Toggle floating |
-| `SUPER + 1~0` | Chuyển workspace |
-| `SUPER + Shift + 1~0` | Di chuyển cửa sổ sang workspace |
-| `SUPER + Arrow Keys` | Di chuyển focus |
-| `SUPER + M` | Thoát Hyprland |
-| `Print` | Chụp toàn màn hình |
-| `SUPER + Shift + S` | Chụp vùng chọn |
+Phím tắt phụ thuộc cấu hình JaKooLit được cài và các override cá nhân. Xem bindings đang dùng trong terminal Hyprland:
 
----
+```bash
+hyprctl binds
+```
+
+Đối chiếu `~/.config/hypr/configs/Keybinds.conf` (nếu bản JaKooLit đang dùng có file này) và `hypr/.config/hypr/UserConfigs/UserKeybinds.conf` trong repo. Không mặc định Super+M luôn là thoát phiên hoặc Super+Q luôn mở terminal.
+
+## Sao lưu trước khi cài lại
+
+Chạy `./scripts/backup.sh` theo [reinstall.md](reinstall.md). Script giữ cả repo chưa commit trên OneDrive mã hóa, không tự push GitHub. Các lệnh Git ở đầu trang dùng để đồng bộ mã/config lên GitHub, không phải các bước bắt buộc để tạo backup.
 
 ## 🧰 Lệnh thường dùng
 
@@ -96,8 +90,8 @@ find ~ -size +100M -type f 2>/dev/null
 # Reload Hyprland config (không cần restart)
 hyprctl reload
 
-# Xem log Hyprland
-journalctl --user -u hyprland -f
+# Xem lỗi phiên boot hiện tại
+journalctl -b -p err
 
 # Neovim — cập nhật plugins
 nvim --headless "+Lazy! sync" +qa
@@ -112,14 +106,14 @@ dotfiles/
 ├── hypr/           → UserConfigs/ override chồng lên JaKooLit upstream
 ├── zsh/            → .zshrc (Oh-My-Zsh + aliases)
 ├── nvim/           → .config/nvim/ (LazyVim)
-├── scripts/        → cleanup.sh và các script tiện ích
+├── scripts/        → cleanup.sh, backup.sh, restore.sh, cloud_backup.py và transfer.py
 ├── docs/           → Tài liệu này
 ├── pkglist.txt     → Package chính thức và AUR được setup.sh cài
 ├── packages/       → Snapshot package thực tế trên máy
 ├── README.md       → Hướng dẫn cài đặt chính
-└── setup.sh        → Script stow tự động
+└── setup.sh        → Cài nền/package/shell và áp cấu hình qua Stow
 ```
 
 ---
 
-*Cập nhật lần cuối: 2026-08-09*
+*Cập nhật lần cuối: 2026-11-05*
