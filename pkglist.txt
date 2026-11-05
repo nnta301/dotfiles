@@ -25,6 +25,7 @@ bat
 eza
 
 # Ứng dụng đồ họa và giải trí
+drawing
 discord
 dbeaver
 intellij-idea-oss
