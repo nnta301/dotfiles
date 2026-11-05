@@ -68,3 +68,11 @@ arch-backup-*/
 home.tar
 etc.tar
 efi-truoc-cai-lai.tar
+
+# Encrypted backup configuration and exported reference archives
+rclone.conf
+efi.tar
+repo.tar
+metadata.tar
+arch-rescue/
+*.partial

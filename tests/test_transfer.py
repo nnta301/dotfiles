@@ -4,6 +4,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import tarfile
 import tempfile
@@ -97,6 +98,16 @@ class RestoreTests(unittest.TestCase):
             self.restore(apply=True, include=['.ssh'])
         self.assertEqual(list(self.home.iterdir()), [])
 
+    def test_missing_intermediate_directories_are_private(self):
+        self.archive([('private/nested/key', b'secret')])
+        previous = os.umask(0o022)
+        try:
+            self.restore(apply=True)
+        finally:
+            os.umask(previous)
+        for name in ('private', 'private/nested'):
+            self.assertEqual((self.home / name).stat().st_mode & 0o777, 0o700)
+
     def test_failed_download_preserves_existing_target(self):
         self.archive([('Documents/work.txt', b'new')])
         (self.home / 'Documents').mkdir()
@@ -127,10 +138,6 @@ class RestoreTests(unittest.TestCase):
                 transfer.restore_tar(argparse.Namespace(apply=True, include=None), self.home, tar)
         self.assertEqual(visited, ['deep/folder/a', 'shallow'])
 
-    def test_backup_destination_in_home_rejected(self):
-        with self.assertRaises(ValueError):
-            transfer.backup(argparse.Namespace(destination=str(self.home), include=None), self.home)
-
     def test_default_paths_include_custom_directories(self):
         for name in ['Code', '.config', '.cache', '.restore-backup-old']:
             (self.home / name).mkdir()
@@ -159,9 +166,9 @@ class RestoreTests(unittest.TestCase):
             return subprocess.CompletedProcess(cmd, code, output, '')
         with mock.patch.object(transfer.subprocess, 'run', side_effect=run), \
              mock.patch.object(transfer.subprocess, 'check_output', return_value='test-head\n'), \
-             mock.patch.object(transfer.shutil, 'which', return_value='/usr/bin/mock'), \
-             mock.patch.object(transfer, 'checked_archive') as archive:
-            warnings = transfer.prepare_system_backup(self.source, self.root)
+             mock.patch.object(transfer.shutil, 'which', return_value='/usr/bin/mock'):
+            archive = mock.Mock()
+            warnings = transfer.prepare_system_backup(self.source, self.root, archive)
         self.assertEqual([call.args[1].name for call in archive.call_args_list], ['repo.tar', 'etc.tar', 'efi.tar'])
         self.assertEqual(archive.call_args_list[-1].args[0], Path('/boot'))
         self.assertTrue(warnings)
@@ -170,38 +177,12 @@ class RestoreTests(unittest.TestCase):
     def test_system_backup_rejects_ambiguous_esp(self):
         with mock.patch.object(transfer.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, 'vfat\n', '')), \
              mock.patch.object(transfer.subprocess, 'check_output', return_value='head\n'), \
-             mock.patch.object(transfer.shutil, 'which', return_value='/usr/bin/mock'), \
-             mock.patch.object(transfer, 'checked_archive') as archive:
+             mock.patch.object(transfer.shutil, 'which', return_value='/usr/bin/mock'):
+            archive = mock.Mock()
             with self.assertRaises(ValueError):
-                transfer.prepare_system_backup(self.source, self.root)
+                transfer.prepare_system_backup(self.source, self.root, archive)
         self.assertEqual(archive.call_count, 2)
 
-    def test_failed_system_backup_has_no_manifest_and_restarts_sync(self):
-        if not Path('/dev/shm').is_dir() or Path('/dev/shm').stat().st_dev == self.home.stat().st_dev:
-            self.skipTest('Needs a separate temporary filesystem')
-        (self.home / 'a').write_text('important')
-        with tempfile.TemporaryDirectory(dir='/dev/shm', prefix='dotfiles-failure-') as dest:
-            with mock.patch.object(transfer, 'pause_onedrive', return_value=True), \
-                 mock.patch.object(transfer.subprocess, 'check_output', return_value='tmpfs\n'), \
-                 mock.patch.object(transfer, 'prepare_system_backup', side_effect=ValueError('test failure')), \
-                 mock.patch.object(transfer.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0)) as run:
-                with self.assertRaises(ValueError):
-                    transfer.backup(argparse.Namespace(destination=dest, include=None), self.home)
-                run.assert_called_once_with(['systemctl', '--user', 'start', 'onedrive.service'])
-            self.assertEqual(list(Path(dest).rglob('manifest.json')), [])
-
-    def test_backup_roundtrip(self):
-        if not Path('/dev/shm').is_dir() or Path('/dev/shm').stat().st_dev == self.home.stat().st_dev:
-            self.skipTest('Needs a separate temporary filesystem')
-        with tempfile.TemporaryDirectory(dir='/dev/shm', prefix='dotfiles-test-') as dest:
-            (self.home / 'Documents').mkdir()
-            (self.home / 'Documents/a.txt').write_text('saved')
-            with contextlib.redirect_stdout(io.StringIO()), mock.patch.object(transfer, 'prepare_system_backup', return_value=[]), mock.patch.object(transfer, 'pause_onedrive', return_value=False):
-                transfer.backup(argparse.Namespace(destination=dest, include=['Documents']), self.home)
-            self.source = next(Path(dest).glob('arch-backup-*'))
-            (self.home / 'Documents/a.txt').unlink()
-            self.restore(apply=True)
-            self.assertEqual((self.home / 'Documents/a.txt').read_text(), 'saved')
 
 
 if __name__ == '__main__':

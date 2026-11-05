@@ -13,11 +13,11 @@ Kiểm tra quota thật bằng `rclone about onedrive:`. Ổ Arch 70 GB không b
 Lưu công việc, đóng ứng dụng đang ghi dữ liệu. Trong repo thật:
 
 ```bash
-cd ~/OneDrive/Documents/dotfiles
+cd ~/Documents/dotfiles
 ./scripts/backup.sh
 ```
 
-Thay `cd` nếu repo ở nơi khác. Nhập mật khẩu sudo khi được hỏi. Script tự lưu home, repo chưa commit, Git bundle, báo cáo máy, `/etc`, EFI; gửi từng phần mã hóa rồi tải lại kiểm tra. Không cần các bước tar hoặc git bundle thủ công.
+Đường dẫn trên ứng với repo hiện tại; thay `cd` nếu clone ở nơi khác. Nhập mật khẩu sudo khi được hỏi. Script tự lưu home, repo chưa commit, Git bundle, báo cáo máy, `/etc`, EFI; gửi từng phần mã hóa rồi tải lại kiểm tra. Không cần các bước tar hoặc git bundle thủ công.
 
 Ghi lại đích được in, ví dụ `archbackup:arch-20261105T010000Z-abcdefgh`. Nếu lỗi, chưa dùng bản đó để format; không có manifest hoàn tất thì chưa phải bản backup đầy đủ. Script giữ OneDrive sync dừng để tránh tải cả backup ngược về ổ local. Xem [cách loại ArchBackups khỏi sync](backup-restore.md#onedrive-sync-sau-backup) trước khi bật lại client, kể cả trên Windows.
 

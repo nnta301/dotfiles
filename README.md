@@ -139,7 +139,7 @@ dotfiles/
     ├── backup.sh                  ← Backup mã hóa lên OneDrive
     ├── restore.sh                 ← Kiểm tra và phục hồi dữ liệu home
     ├── cloud_backup.py            ← Upload/đọc cloud theo từng phần
-    └── transfer.py                ← Kiểm tra/restore và hỗ trợ backup local cũ
+    └── transfer.py                ← Kiểm tra và restore backup local cũ
 ```
 
 > `lazy-lock.json` lưu phiên bản plugin Neovim để khôi phục nhất quán. Sau khi cập nhật plugin, kiểm tra và commit thay đổi lockfile nếu muốn giữ phiên bản mới.

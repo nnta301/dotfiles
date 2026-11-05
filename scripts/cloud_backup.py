@@ -30,6 +30,21 @@ def remote_info(remote):
     name = remote.split(':', 1)[0]
     if name not in config or config[name].get('type') != 'crypt':
         raise ValueError('Cần remote crypt đã cấu hình. Xem docs/backup-restore.md; không upload bản rõ.')
+    # Reject unsafe crypt configuration even if it would otherwise look like a
+    # valid OneDrive remote. Explicit CLI flags below also prevent environment
+    # overrides from disabling encryption during an upload/download.
+    try:
+        unsafe_config = config[name].getboolean('no_data_encryption', fallback=False)
+    except ValueError as exc:
+        raise ValueError('Giá trị no_data_encryption không hợp lệ.') from exc
+    env_names = ('RCLONE_CRYPT_NO_DATA_ENCRYPTION',
+                 'RCLONE_CONFIG_' + re.sub(r'[^A-Z0-9]', '_', name.upper()) + '_NO_DATA_ENCRYPTION')
+    for env_name in env_names:
+        value = os.environ.get(env_name, '').strip().lower()
+        if value and value not in ('false', '0'):
+            raise ValueError(f'{env_name} phải tắt; không gửi dữ liệu bản rõ.')
+    if unsafe_config:
+        raise ValueError('Remote crypt đã tắt mã hóa nội dung; không sử dụng backup này.')
     underlying = config[name].get('remote', '')
     drive = underlying.split(':', 1)[0]
     if ':' not in underlying or drive not in config or config[drive].get('type') != 'onedrive':
@@ -39,14 +54,14 @@ def remote_info(remote):
 
 def download(remote):
     # A corrupt remote object must not exhaust RAM before its checksum is checked.
-    data = subprocess.check_output(['rclone', 'cat', remote, '--count', str(CHUNK + 1)])
+    data = subprocess.check_output(['rclone', '--crypt-no-data-encryption=false', 'cat', remote, '--count', str(CHUNK + 1)])
     if len(data) > CHUNK:
         raise ValueError(f'Đối tượng cloud vượt giới hạn {CHUNK} byte: {remote}')
     return data
 
 
 def upload_verified(remote, data):
-    subprocess.run(['rclone', 'rcat', remote, '--size', str(len(data))], input=data, check=True)
+    subprocess.run(['rclone', '--crypt-no-data-encryption=false', 'rcat', remote, '--size', str(len(data))], input=data, check=True)
     received = download(remote)
     if hashlib.sha256(received).digest() != hashlib.sha256(data).digest():
         raise ValueError(f'Đọc lại từ OneDrive không khớp: {remote}')
@@ -251,8 +266,16 @@ def backup(args, home):
     if not selected:
         raise ValueError('Không có dữ liệu được chọn.')
     # Conservative plain-size estimate; tar/encryption and duplicated repo need headroom.
-    estimate = sum(info.st_size + 4096 if stat.S_ISREG(info.st_mode) else 4096
-                   for _, _, info in home_entries(home, selected, exclusions, []))
+    estimate = 0
+    included_roots = set()
+    for _, name, info in home_entries(home, selected, exclusions, []):
+        if name in selected:
+            included_roots.add(name)
+        estimate += info.st_size + 4096 if stat.S_ISREG(info.st_mode) else 4096
+    if args.include and len(included_roots) != len(selected):
+        raise ValueError('Đường dẫn --include bị loại khỏi backup: ' + ', '.join(n for n in selected if n not in included_roots))
+    if not estimate:
+        raise ValueError('Các đường dẫn được chọn đều bị loại khỏi backup; chưa upload.')
     quota = json.loads(subprocess.check_output(['rclone', 'about', drive, '--json'], text=True))
     if 'free' not in quota:
         raise ValueError('Không đọc được dung lượng OneDrive còn trống.')
@@ -318,12 +341,31 @@ def restore(args, home):
         raise ValueError('Backup cloud thiếu archive bắt buộc.')
     if args.export_system:
         destination = Path(args.export_system).expanduser()
+        if os.path.lexists(destination):
+            raise ValueError(f'Thư mục export đã tồn tại: {destination}')
+        parent = destination.parent
+        while not parent.exists():
+            parent = parent.parent
+        readers = {name: ChunkReader(remote, archives[name]) for name in sorted(expected - {'home.tar'})}
+        required = sum(reader.size for reader in readers.values())
+        if shutil.disk_usage(parent).free < required + 64 * 1024 * 1024:
+            raise ValueError('Không đủ dung lượng export archive và 64 MiB dự phòng; chưa tạo thư mục.')
         destination.mkdir(mode=0o700, parents=True, exist_ok=False)
-        for name in sorted(expected - {'home.tar'}):
-            reader = ChunkReader(remote, archives[name])
-            reader.verify()
-            with (destination / name).open('xb') as output:
-                shutil.copyfileobj(reader, output)
+        for name, reader in readers.items():
+            temporary = destination / (name + '.partial')
+            try:
+                sha = hashlib.sha256()
+                with temporary.open('xb') as output:
+                    while data := reader.read(1024 * 1024):
+                        output.write(data)
+                        sha.update(data)
+                    output.flush()
+                    os.fsync(output.fileno())
+                if sha.hexdigest() != reader.description['sha256']:
+                    raise ValueError(f'Checksum archive sai: {name}')
+                os.replace(temporary, destination / name)
+            finally:
+                temporary.unlink(missing_ok=True)
         print('Đã xuất archive hệ thống vào', destination, '— không tự áp vào hệ thống.')
         return
     # Verify every archive before any write to the target home.

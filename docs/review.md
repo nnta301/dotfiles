@@ -1,5 +1,11 @@
 # Rà soát ngày 05/11/2026
 
+## Cập nhật sau rà soát
+
+Đã xử lý thêm: từ chối crypt tắt mã hóa nội dung; chặn từng lựa chọn home tường minh bị loại; export kiểm tra dung lượng và chỉ đặt tên file hoàn chỉnh sau checksum; tạo từng thư mục restore mới với quyền 700; bổ sung ignore cho cấu hình và archive backup; bỏ luồng tạo backup local trùng lặp nhưng giữ restore backup cũ. `rclone` và `config` có thể chứa bí mật; `.gitignore` chỉ giảm nguy cơ, không thay việc kiểm tra `git diff --cached` trước commit.
+
+Installer JaKooLit vẫn tải nhánh hiện hành. Chưa ghim revision vì chưa kiểm thử cài mới một revision cụ thể; xem đây là giới hạn cần xử lý trước khi format. Wiki Hyprland hiện tại dùng cú pháp mới, liên kết phiên bản cũ vẫn giữ cho các lệnh đang được hướng dẫn.
+
 ## Các lỗi đã xử lý
 
 - Restore home: tải file thay thế vào file tạm, kiểm tra kích thước trước khi di chuyển file cũ; thiếu dung lượng thì dừng trước khi ghi. Chặn đích nằm trên filesystem khác mount dưới home. Đọc theo thứ tự archive để giảm tải lại chunk qua mạng.
@@ -23,7 +29,7 @@ Kiểm thử tự động bao gồm restore khi mất mạng/thiếu dung lượ
 python3 -m unittest discover -s tests -v
 ```
 
-**Chưa kiểm thử backup/restore với tài khoản OneDrive thật và chưa cài lại đầy đủ trên máy/VM trống.** Phải tạo backup hoàn tất, chạy restore dry-run và giữ khóa crypt truy cập được từ ngoài Arch trước khi format. Kiểm tra dung lượng chỉ là ảnh chụp tại thời điểm chạy; tiến trình khác vẫn có thể làm đầy ổ. Export hệ thống bị ngắt có thể để lại file tải dở trong thư mục đích: chỉ dùng khi lệnh kết thúc thành công. Restore home không rollback toàn bộ các file đã phục hồi trước một lỗi.
+**Chưa kiểm thử backup/restore với tài khoản OneDrive thật và chưa cài lại đầy đủ trên máy/VM trống.** Phải tạo backup hoàn tất, chạy restore dry-run và giữ khóa crypt truy cập được từ ngoài Arch trước khi format. Kiểm tra dung lượng chỉ là ảnh chụp tại thời điểm chạy; tiến trình khác vẫn có thể làm đầy ổ. Export hệ thống bị ngắt có thể để lại thư mục đích chứa các archive đã hoàn thành; chỉ coi toàn bộ export là thành công khi lệnh kết thúc không lỗi. Restore home không rollback toàn bộ các file đã phục hồi trước một lỗi.
 
 ## Nguồn đối chiếu
 

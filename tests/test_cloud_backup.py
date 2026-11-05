@@ -122,6 +122,58 @@ class CloudTests(unittest.TestCase):
         with mock.patch.object(cloud.subprocess, 'check_output', return_value=config):
             self.assertEqual(cloud.remote_info('encrypted:'), ('drive:', 'ArchBackups'))
 
+    def test_crypt_refuses_disabled_content_encryption(self):
+        config = '[encrypted]\ntype = crypt\nremote = drive:ArchBackups\nno_data_encryption = true\n[drive]\ntype = onedrive\n'
+        with mock.patch.object(cloud.subprocess, 'check_output', return_value=config):
+            with self.assertRaises(ValueError):
+                cloud.remote_info('encrypted:')
+        config = config.replace('no_data_encryption = true\n', '')
+        for key in ('RCLONE_CRYPT_NO_DATA_ENCRYPTION', 'RCLONE_CONFIG_ENCRYPTED_NO_DATA_ENCRYPTION'):
+            with self.subTest(key=key), mock.patch.dict(os.environ, {key: 'true'}), \
+                 mock.patch.object(cloud.subprocess, 'check_output', return_value=config):
+                with self.assertRaises(ValueError):
+                    cloud.remote_info('encrypted:')
+
+    def test_excluded_explicit_selection_stops_before_upload(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp); (home / '.cache').mkdir()
+            (home / '.cache/important').write_text('data')
+            with mock.patch.object(cloud, 'remote_info', return_value=('drive:', 'ArchBackups')):
+                with self.assertRaisesRegex(ValueError, 'bị loại'):
+                    cloud.backup(argparse.Namespace(remote='test:', include=['.cache']), home)
+            self.assertEqual(self.remote, {})
+
+    def test_mixed_selection_rejects_excluded_root(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp); (home / '.cache').mkdir(); (home / 'Documents').mkdir()
+            with mock.patch.object(cloud, 'remote_info', return_value=('drive:', 'ArchBackups')):
+                with self.assertRaisesRegex(ValueError, 'bị loại'):
+                    cloud.backup(argparse.Namespace(remote='test:', include=['Documents', '.cache']), home)
+            self.assertEqual(self.remote, {})
+
+    def test_export_insufficient_space_does_not_create_destination(self):
+        self.manifest(self.tarbytes())
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(cloud, 'remote_info'), \
+             mock.patch.object(cloud.shutil, 'disk_usage', return_value=argparse.Namespace(free=1)):
+            destination = Path(tmp) / 'export'
+            with self.assertRaises(ValueError):
+                cloud.restore(argparse.Namespace(source='test:backup', export_system=str(destination)), Path(tmp))
+            self.assertFalse(destination.exists())
+
+    def test_export_failure_does_not_publish_partial_archive(self):
+        self.manifest(self.tarbytes())
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(cloud, 'remote_info'):
+            destination = Path(tmp) / 'export'
+            original = cloud.download
+            def fail_chunk(path):
+                if path.endswith('efi.tar.part000000'):
+                    raise OSError('network failure')
+                return original(path)
+            with mock.patch.object(cloud, 'download', side_effect=fail_chunk):
+                with self.assertRaises(OSError):
+                    cloud.restore(argparse.Namespace(source='test:backup', export_system=str(destination)), Path(tmp))
+            self.assertEqual(list(destination.iterdir()), [])
+
     def test_full_backup_streams_home_and_publishes_manifest_last(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp); documents = home / 'Documents'; documents.mkdir()
@@ -169,8 +221,10 @@ class CloudTests(unittest.TestCase):
                 subprocess.run(['rclone', 'config', 'create', 'localtest', 'crypt',
                                 'remote', str(encrypted), 'password', 'test-only-password', '--obscure'],
                                check=True, capture_output=True)
-                cloud.upload_verified('localtest:payload', b'private test data')
-                self.assertEqual(cloud.download('localtest:payload'), b'private test data')
+                # Even a process environment override must not disable data encryption.
+                with mock.patch.dict(os.environ, {'RCLONE_CRYPT_NO_DATA_ENCRYPTION': 'true'}):
+                    cloud.upload_verified('localtest:payload', b'private test data')
+                    self.assertEqual(cloud.download('localtest:payload'), b'private test data')
                 blobs = [p.read_bytes() for p in encrypted.iterdir() if p.is_file()]
                 self.assertTrue(blobs)
                 self.assertNotIn(b'private test data', blobs)

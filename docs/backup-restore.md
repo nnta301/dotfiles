@@ -39,7 +39,7 @@ Lưu công việc, đóng ứng dụng đang ghi dữ liệu. Trong repo:
 ./scripts/backup.sh
 ```
 
-Mặc định dùng `archbackup:`. Nếu đã đặt tên khác, dùng `--remote ten-crypt:`. Chỉ chấp nhận remote **crypt trỏ trực tiếp vào OneDrive**, không gửi archive chứa bí mật lên remote bản rõ.
+Mặc định dùng `archbackup:`. Nếu đã đặt tên khác, dùng `--remote ten-crypt:`. Chỉ chấp nhận remote **crypt trỏ trực tiếp vào OneDrive**, có bật mã hóa nội dung. Script từ chối `no_data_encryption=true` trong cấu hình hoặc biến môi trường và buộc bật mã hóa khi truyền dữ liệu.
 
 Script tự:
 
@@ -49,7 +49,7 @@ Script tự:
 - Sao lưu `/etc`, EFI và so sánh archive với nguồn. ESP phải được mount duy nhất tại `/efi`, `/boot/efi` hoặc `/boot`, có Windows Boot Manager.
 - Gửi home và các archive theo phần nhỏ, mã hóa qua crypt, tải lại từng phần để đối chiếu checksum. Chỉ ghi manifest hoàn tất sau khi mọi bước thành công.
 
-Home mặc định gồm thư mục riêng, file ẩn và **dữ liệu local trong OneDrive**; không tự bỏ dữ liệu đó vì chưa chứng minh tất cả đã lên cloud. Bỏ `.cache`, `.restore-backup-*`, filesystem khác mount trong home, đối tượng runtime; symlink chỉ giữ liên kết. Script đọc `sync_dir` từ cấu hình client trong `$XDG_CONFIG_HOME/onedrive/config` (mặc định `~/.config/onedrive/config`), nếu chưa có thì dùng `~/OneDrive`. Thư mục cloud `ArchBackups` bên trong thư mục sync bị loại để tránh backup lặp. Nếu chạy client với cấu hình riêng, thêm `--onedrive-dir /đường/dẫn/thư-mục-sync` vào lệnh backup. Đường dẫn `--include` không tồn tại sẽ làm script dừng trước upload.
+Home mặc định gồm thư mục riêng, file ẩn và **dữ liệu local trong OneDrive**; không tự bỏ dữ liệu đó vì chưa chứng minh tất cả đã lên cloud. Bỏ `.cache`, `.restore-backup-*`, filesystem khác mount trong home, đối tượng runtime; symlink chỉ giữ liên kết. Script đọc `sync_dir` từ cấu hình client trong `$XDG_CONFIG_HOME/onedrive/config` (mặc định `~/.config/onedrive/config`), nếu chưa có thì dùng `~/OneDrive`. Thư mục cloud `ArchBackups` bên trong thư mục sync bị loại để tránh backup lặp. Nếu chạy client với cấu hình riêng, thêm `--onedrive-dir /đường/dẫn/thư-mục-sync` vào lệnh backup. Đường dẫn `--include` không tồn tại hoặc bị loại sẽ làm script dừng trước upload, kể cả khi các lựa chọn khác hợp lệ. Nếu chọn nhiều đường dẫn, xem `skipped` trong manifest để biết các mục cụ thể bị loại.
 
 Tùy chọn giới hạn home (thay toàn bộ danh sách mặc định, không cộng thêm):
 
@@ -91,7 +91,7 @@ Archive hệ thống được lưu thành các phần mã hóa, không thể t�
   --export-system /tmp/arch-rescue
 ```
 
-Thư mục đích phải **chưa tồn tại**, đủ chỗ. Lệnh kiểm tra và tải `efi.tar`, `etc.tar`, `repo.tar`, `metadata.tar`, không phục hồi vào hệ thống. `metadata.tar` chứa `reports/`, `REPORT.txt` và Git bundle. Mở/giải nén vào thư mục riêng để đọc; không giải nén đè `/etc` hay EFI. Lệnh này không kiểm tra archive home; cần dry-run đầy đủ ở bước 3 trước khi format.
+Thư mục đích phải **chưa tồn tại**. Trước khi tạo thư mục, script kiểm tra đủ chỗ cho tổng archive hệ thống cộng 64 MiB dự phòng. Lệnh kiểm tra và tải `efi.tar`, `etc.tar`, `repo.tar`, `metadata.tar`, không phục hồi vào hệ thống. Mỗi archive chỉ được đặt tên hoàn chỉnh sau khi tải xong và kiểm tra checksum; lỗi có thể để lại thư mục đích với các archive đã hoàn thành, hãy dùng thư mục mới khi thử lại. `metadata.tar` chứa `reports/`, `REPORT.txt` và Git bundle. Mở/giải nén vào thư mục riêng để đọc; không giải nén đè `/etc` hay EFI. Lệnh này không kiểm tra archive home; cần dry-run đầy đủ ở bước 3 trước khi format.
 
 **Nếu đang ở USB Arch live:** cần mạng; có thể cài công cụ vào môi trường live (không phải `/mnt`):
 
@@ -115,7 +115,7 @@ Sau khi cài Arch và hoàn tất `setup.sh`, cấu hình lại hai remote như 
 ./scripts/restore.sh archbackup:arch-20261105T010000Z-abcdefgh --apply
 ```
 
-Mặc định chỉ phục hồi các mục cấp đầu không ẩn để giữ cấu hình mới. Mỗi file được tải hoàn chỉnh vào file tạm và kiểm tra kích thước trước khi chuyển file trùng vào `~/.restore-backup-*` rồi thay thế; không xóa file thừa. Lỗi tải file hiện tại không làm mất file cũ. Thư mục mới quyền 700, file thuộc user mới và giữ mode thường, bỏ setuid/setgid; không phục hồi ACL/xattrs/owner cũ cho home. Symlink/hardlink được báo bỏ qua. Mất mạng giữa chừng có thể để lại một phần đã restore; kiểm tra home và bản sao file cũ, không có rollback toàn bộ.
+Mặc định chỉ phục hồi các mục cấp đầu không ẩn để giữ cấu hình mới. Mỗi file được tải hoàn chỉnh vào file tạm và kiểm tra kích thước trước khi chuyển file trùng vào `~/.restore-backup-*` rồi thay thế; không xóa file thừa. Lỗi tải file hiện tại không làm mất file cũ. Thư mục mới, kể cả các thư mục cha trung gian, được tạo với quyền tối đa 700; thư mục đã tồn tại giữ quyền cũ, file thuộc user mới và giữ mode thường, bỏ setuid/setgid; không phục hồi ACL/xattrs/owner cũ cho home. Symlink/hardlink được báo bỏ qua. Mất mạng giữa chừng có thể để lại một phần đã restore; kiểm tra home và bản sao file cũ, không có rollback toàn bộ.
 
 Muốn lấy SSH keys hoặc một cấu hình cụ thể, chọn riêng:
 
@@ -124,7 +124,7 @@ Muốn lấy SSH keys hoặc một cấu hình cụ thể, chọn riêng:
 ./scripts/restore.sh archbackup:arch-20261105T010000Z-abcdefgh --include .ssh --apply
 ```
 
-Restore không cần đủ chỗ cho cả archive cộng dữ liệu giải nén, nhưng vẫn cần chỗ cho dữ liệu phục hồi và các file cũ được giữ lại. Trước khi ghi home, script kiểm tra dung lượng trống theo tổng kích thước file được chọn cộng 64 MiB dự phòng; không phục hồi vào filesystem khác mount dưới home. EFI, `/etc`, dịch vụ và database không tự phục hồi. Đăng nhập lại các ứng dụng/2FA; profile Chrome không bảo đảm giữ phiên đăng nhập. Backup local phiên bản cũ vẫn dùng được bằng `restore.sh /đường/dẫn/arch-backup-*`.
+Restore không cần đủ chỗ cho cả archive cộng dữ liệu giải nén, nhưng vẫn cần chỗ cho dữ liệu phục hồi và các file cũ được giữ lại. Trước khi ghi home, script kiểm tra dung lượng trống theo tổng kích thước file được chọn cộng 64 MiB dự phòng; không phục hồi vào filesystem khác mount dưới home. EFI, `/etc`, dịch vụ và database không tự phục hồi. Đăng nhập lại các ứng dụng/2FA; profile Chrome không bảo đảm giữ phiên đăng nhập. Không còn tạo backup local bằng `transfer.py`; backup local phiên bản cũ vẫn khôi phục được bằng `restore.sh /đường/dẫn/arch-backup-*`.
 
 ## Kiểm chứng
 

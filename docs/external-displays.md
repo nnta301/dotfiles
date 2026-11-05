@@ -61,4 +61,4 @@ Kiểm tra nguồn HDMI, dây và adapter; sau đó chạy `hyprctl monitors all
 
 Các liên kết sau là tài liệu phiên bản 0.54.0, không phải xác nhận tương thích với mọi phiên bản mới. Trên máy hiện tại Hyprland 0.56.2 không báo lỗi qua `hyprctl configerrors`; sau cập nhật cần kiểm tra lại lệnh này và thử cả hai chế độ màn hình.
 
-Tham khảo [Hyprland: cấu hình màn hình](https://wiki.hypr.land/0.54.0/Configuring/Monitors/) và [hyprctl](https://wiki.hypr.land/0.54.0/Configuring/Using-hyprctl/).
+Tham khảo cho cú pháp cũ [Hyprland: cấu hình màn hình](https://wiki.hypr.land/0.54.0/Configuring/Monitors/) và [hyprctl](https://wiki.hypr.land/0.54.0/Configuring/Using-hyprctl/). [Wiki màn hình hiện tại](https://wiki.hypr.land/configuring/core/monitors/) dùng cú pháp cấu hình mới; đối chiếu phiên bản Hyprland trước khi áp dụng.
