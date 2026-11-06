@@ -6,6 +6,14 @@
 
 Làm phần restore trong [reinstall.md](reinstall.md): xem trước bằng `restore.sh --dry-run`, sau đó dùng `--apply`. Cấu hình ẩn cần chọn riêng bằng `--include`; không chép đè cả home hay `/etc` lên hệ thống mới. Xem [backup/restore](backup-restore.md) về backup file bị thay thế và các giới hạn.
 
+Các mục ẩn như `.ssh`, `.gnupg` và cấu hình ứng dụng cần chọn riêng sau khi kiểm tra, ví dụ:
+
+```bash
+./scripts/restore.sh archbackup:arch-20261105T010000Z-abcdefgh --include .ssh --include .gnupg --dry-run
+```
+
+Thay ID bằng bản thật; nếu một mục không có trong backup, bỏ mục đó khỏi lệnh. Chỉ thêm `--apply` thay `--dry-run` sau khi xem kết quả. Không restore toàn bộ `.config` một cách mù quáng: một số thư mục như `.config/nvim` có thể là symlink Stow và script sẽ dừng do xung đột; xem trước, chọn cấu hình ứng dụng cần thiết và xử lý symlink thủ công. Symlink trong backup được liệt kê nhưng không tự khôi phục.
+
 ## 2. Git và SSH
 
 Kiểm tra danh tính Git hiện có:
@@ -42,6 +50,8 @@ systemctl --user enable --now onedrive.service
 
 Nếu đã có dịch vụ hoặc một tiến trình sync khác, kiểm tra trước để tránh chạy hai client cho cùng thư mục. Repo có rclone nhưng không tự thiết lập remote; không mount rclone đè lên `~/OneDrive` đang chứa dữ liệu của client OneDrive. Token không được push lên Git.
 
+Các alias `zalo`, `teams`, `outlook` và `onedrive-web` dùng Chrome app ID. Sau khi đăng nhập Chrome, cài lại từng web app nếu dùng; ID/profile có thể thay đổi, hãy kiểm tra alias nếu lệnh không mở đúng. `parsecd` là alias tùy chọn: repo hiện không cài Parsec, nên chỉ dùng sau khi bạn tự cài ứng dụng phù hợp.
+
 Đăng nhập Chrome, trình quản lý mật khẩu và các ứng dụng cần tài khoản; có thể cần 2FA. Kiểm tra extension sau khi đăng nhập/sync, cài lại phần còn thiếu từ nguồn chính thức. Không mặc định mọi extension đều thiếu hoặc không thể đồng bộ. Profile cũ không bảo đảm giữ phiên đăng nhập/mật khẩu.
 
 ## 4. Shell và bộ gõ
@@ -58,6 +68,8 @@ Profile Fcitx5 trong repo đã có Keyboard US và Bamboo. Mở `fcitx5-configto
 
 Setup cài package không đồng nghĩa đã bật mọi dịch vụ. Xem [phần nhóm tùy chọn](arch-windows-dual-boot.md#các-nhóm-tùy-chọn) trước khi thêm `input` hoặc `docker`. Chỉ bật Docker/database khi cần và sau khi chuẩn bị dữ liệu tương ứng; không bật toàn bộ danh sách dịch vụ cũ từ báo cáo backup.
 
+Nếu dùng TeamViewer hoặc auto-cpufreq, kiểm tra unit thật bằng `systemctl list-unit-files 'teamviewer*' 'auto-cpufreq*'`; chỉ enable unit cần dùng sau khi đọc hướng dẫn package. Tránh đồng thời bật nhiều công cụ điều chỉnh năng lượng xung đột.
+
 Với Bluetooth, kiểm tra dịch vụ trước khi ghép thiết bị:
 
 ```bash
@@ -69,6 +81,8 @@ Nếu muốn dùng Bluetooth và dịch vụ chưa chạy, dùng `sudo systemctl
 ## 6. Màn hình và Neovim
 
 Xem [hướng dẫn màn hình ngoài](external-displays.md) cho hai chế độ mirror và chỉ màn hình ngoài. Xác định cổng thật bằng `hyprctl monitors`, không mặc định tên HDMI luôn giống máy cũ.
+
+Nếu HDMI không xuất hình trên máy từng dùng EnvyControl, kiểm tra `envycontrol --query` và đọc hướng dẫn màn hình ngoài. Trên máy cũ, chế độ `hybrid` từng giúp HDMI hoạt động; không tự đổi GPU khi chưa kiểm tra driver, dung lượng `/boot` và phương án phục hồi. Đổi chế độ có thể cần tạo initramfs và reboot.
 
 Mở `nvim` và chờ trình quản lý plugin hoàn tất, đọc lỗi nếu có. Dùng `:Lazy` để xem trạng thái; kiểm tra các công cụ ngôn ngữ cần cho project bằng giao diện của cấu hình đang cài. Không chạy cập nhật tất cả plugin chỉ để kiểm tra phục hồi: repo đã giữ phiên bản trong `lazy-lock.json`.
 

@@ -10,7 +10,7 @@ Lộ trình hỗ trợ Windows đã cài trên máy x86-64 ở chế độ **UEF
 
 **Đang dùng Arch và chuẩn bị cài lại?** Làm trước [checklist thao tác trên Arch cũ](reinstall.md), từ cấu hình backup OneDrive đến kiểm tra USB. Xong checklist mới quay lại các bước phân vùng bên dưới.
 
-Nếu máy đã có Arch và định cài lại, bạn có thể dùng lại phân vùng root cũ theo nhánh riêng ở mục 4; thao tác format sẽ xóa Arch và mọi dữ liệu trên phân vùng đó. Ảnh chụp ở [reinstall.md](reinstall.md) cho thấy máy này từng có nhiều phân vùng Windows/BitLocker và Arch: phải kiểm tra lại trạng thái thực tế.
+Nếu máy đã có Arch và định cài lại, bạn có thể dùng lại phân vùng root cũ theo nhánh riêng ở mục 4; thao tác format sẽ xóa Arch và mọi dữ liệu trên phân vùng đó. Máy có thể có nhiều phân vùng Windows/BitLocker và Arch: phải kiểm tra lại trạng thái thực tế bằng báo cáo trong [reinstall.md](reinstall.md).
 
 **Trước khi xóa Arch cũ**, mở terminal trong Arch đang chạy và ghi lại kết quả các lệnh chỉ đọc sau để đối chiếu với USB:
 
@@ -24,7 +24,7 @@ Ghi root filesystem UUID, PARTUUID, tên ổ/model, kích thước, và lưu k�
 
 Nếu cài lại Arch trên máy cũ và EFI gần đầy, làm thêm **mục 0.2** để sao lưu EFI trước khi tắt Arch. Mục 4.1 sẽ dùng bản sao đó để xử lý file boot Arch cũ từ USB cài đặt.
 
-- Sao lưu file, dự án, khóa, dữ liệu ứng dụng ra ổ độc lập và xác nhận mở được bản sao. Lưu **BitLocker recovery key** ngoài máy trước mọi thay đổi firmware, boot hoặc phân vùng; kiểm tra mở được khóa. Windows có thể yêu cầu khóa sau khi đổi Secure Boot/bootloader. Không đăng khóa lên Git. Xem [Microsoft: tìm khóa khôi phục](https://support.microsoft.com/windows/find-your-bitlocker-recovery-key-6b71ad27-0b89-ea08-f143-056f5ab347d6).
+- Sao lưu file, dự án, khóa và dữ liệu ứng dụng vào nơi độc lập với ổ sẽ cài lại (OneDrive theo checklist hoặc ổ ngoài), rồi xác nhận mở được bản sao. Lưu **BitLocker recovery key** ngoài máy trước mọi thay đổi firmware, boot hoặc phân vùng; kiểm tra mở được khóa. Windows có thể yêu cầu khóa sau khi đổi Secure Boot/bootloader. Không đăng khóa lên Git. Xem [Microsoft: tìm khóa khôi phục](https://support.microsoft.com/windows/find-your-bitlocker-recovery-key-6b71ad27-0b89-ea08-f143-056f5ab347d6).
 - Cần USB trống ít nhất 4 GB (sẽ bị xóa), nguồn điện, internet; nên dành ít nhất 40 GB **vùng trống liên tục** cho Arch và nhiều hơn tùy nhu cầu. Không dùng vùng chứa bản sao lưu. Ngắt các ổ ngoài không liên quan.
 - Trong Windows, `Win + R` → `msinfo32`: `BIOS Mode` phải là `UEFI`. Trong Disk Management kiểm tra ổ là GPT qua Properties → Volumes. Nắm rõ phím boot menu theo tài liệu hãng. Không đổi RAID/RST hay các thiết lập ổ khác khi chưa hiểu tác động.
 - `root` là tài khoản quản trị; `sudo` chạy một lệnh quản trị bằng mật khẩu tài khoản thường. Khi nhập mật khẩu Linux, ký tự không hiển thị.
@@ -303,7 +303,7 @@ id an
 getent passwd an
 ```
 
-Kết quả `id` cần có nhóm `wheel`; `getent passwd` cho biết thư mục home và shell. Nếu bạn định khôi phục file từ hệ thống cũ, so sánh UID/GID mới với số đã ghi ở mục 0 và kiểm tra quyền sở hữu file sau khi khôi phục. Tên tài khoản giống nhau không đảm bảo UID/GID giống nhau.
+Kết quả `id` cần có nhóm `wheel`; `getent passwd` cho biết thư mục home và shell. Nếu bạn định khôi phục file từ hệ thống cũ, so sánh UID/GID mới với `reports/user-id.txt` trong `metadata.tar` đã backup và kiểm tra quyền sở hữu file sau khi khôi phục. Tên tài khoản giống nhau không đảm bảo UID/GID giống nhau.
 
 Cài microcode cho đúng CPU: xem `lscpu | grep 'Vendor ID'`. Nếu là `GenuineIntel`, chạy `pacman -S intel-ucode`; nếu là `AuthenticAMD`, chạy `pacman -S amd-ucode`. Chỉ chọn gói phù hợp. Kiểm tra `grep '^HOOKS=' /etc/mkinitcpio.conf` có từ `microcode`; nếu thiếu, mở `nano /etc/mkinitcpio.conf` và thêm `microcode` vào trong ngoặc của dòng `HOOKS`, rồi lưu. Tạo lại initramfs:
 
@@ -370,6 +370,16 @@ ping -c 3 archlinux.org
 sudo -v
 ```
 
+Kiểm tra đồng hồ và đồng bộ mạng sau khi đã kết nối (trong Arch mới, không chạy trong chroot):
+
+```bash
+timedatectl
+sudo timedatectl set-ntp true
+timedatectl status
+```
+
+Nếu `set-ntp` báo không có dịch vụ NTP, kiểm tra dịch vụ đồng bộ thời gian đang cài; không tiếp tục với đồng hồ sai. Dual boot Windows mặc định có thể dùng RTC theo giờ địa phương, còn Arch mặc định dùng UTC, gây lệch giờ. [ArchWiki khuyến nghị cấu hình Windows dùng UTC](https://wiki.archlinux.org/title/System_time#UTC_in_Microsoft_Windows); làm theo hướng dẫn đó trên Windows bằng quyền administrator, rồi xác minh thời gian trên cả hai hệ điều hành. Nếu không muốn sửa Windows, xem tùy chọn RTC localtime và giới hạn của nó trong cùng tài liệu; không chạy `timedatectl` trong chroot.
+
 Nếu `sudo -v` thất bại, kiểm tra cấu hình wheel bằng tài khoản root trước khi tiếp tục. Cập nhật toàn hệ thống và cài công cụ cơ bản:
 
 ```bash
@@ -414,13 +424,13 @@ Nếu setup vừa chạy installer JaKooLit và installer tạo được `hyprla
 cd ~/dotfiles
 ```
 
+Trước khi chạy, đọc `pkglist.txt`: danh sách có `nvidia-open`, `intel-ucode`, kernel và bootloader của máy cũ. Xóa hoặc comment các gói không phù hợp với phần cứng; nếu JaKooLit đã cài driver NVIDIA khác như `nvidia-dkms`, kiểm tra tương thích và giải quyết xung đột driver trước khi cài. Không xác nhận thay thế driver khi chưa hiểu tác động.
+
 Repo có cấu hình màn hình laptop `eDP-1`. Xem tên màn hình bằng `hyprctl monitors` và đọc `hypr/.config/hypr/UserConfigs/LaptopDisplay.conf`; chỉnh file trong repo nếu phần cứng khác. Sao lưu cấu hình JaKooLit và file cá nhân quan trọng ra nơi độc lập.
 
 ```bash
 ./setup.sh
 ```
-
-Trước khi chạy, đọc `pkglist.txt`: danh sách có `nvidia-open`, `intel-ucode`, kernel và bootloader của máy cũ. Xóa hoặc comment các gói không phù hợp với phần cứng; nếu JaKooLit đã cài driver NVIDIA khác như `nvidia-dkms`, kiểm tra tương thích và giải quyết xung đột driver trước khi cài. Không xác nhận thay thế driver khi chưa hiểu tác động.
 
 Script cập nhật hệ thống, cài toàn bộ package chính thức trong `pkglist.txt` bằng Pacman và kiểm tra rồi cài các dòng `aur/` bằng yay. Script cũng cài các ứng dụng Flatpak trong `packages/flatpak-apps.txt` từ Flathub cho người dùng hiện tại. Sau đó script chuẩn bị Oh My Zsh, hai plugin và theme nếu thiếu, rồi áp dụng cấu hình `zsh`, `nvim`, `hypr`, `fcitx5` qua Stow. Cần mạng và quyền `sudo`; nếu cài package hoặc tải thành phần shell thất bại, script dừng trước khi Stow. Nếu chưa có yay và danh sách có AUR, script tải PKGBUILD yay và dừng để bạn kiểm tra trước khi build. Các gói AUR do cộng đồng duy trì: đọc PKGBUILD và phản hồi các câu hỏi của yay; tên gói có thể thay đổi hoặc build thất bại, khi đó sửa danh sách/lỗi rồi chạy lại.
 

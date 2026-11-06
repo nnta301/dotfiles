@@ -181,7 +181,13 @@ stow_configs() {
         backup_existing "$pkg" || return 1
 
         info "  Stowing: $pkg"
-        if ! stow -d "$DOTFILES_DIR" -t "$HOME" -R "$pkg"; then
+        local -a stow_options=()
+        # Avoid linking the entire fcitx5 directory into the repo: the input
+        # method writes runtime files alongside the managed profile.
+        if [[ "$pkg" == fcitx5 ]]; then
+            stow_options+=(--no-folding)
+        fi
+        if ! stow -d "$DOTFILES_DIR" -t "$HOME" "${stow_options[@]}" -R "$pkg"; then
             error "  Stow thất bại do xung đột; giữ nguyên repo. Kiểm tra cấu hình và bản sao tại $BACKUP_DIR."
             return 1
         fi

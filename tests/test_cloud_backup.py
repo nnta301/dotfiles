@@ -261,5 +261,23 @@ class CloudTests(unittest.TestCase):
                 self.assertEqual(tar.extractfile('./file').read(), b'payload')
 
 
+class UploadRetryTests(unittest.TestCase):
+    def test_retry_after_failed_transfer(self):
+        error = subprocess.CalledProcessError(1, ['rclone'])
+        with mock.patch.object(cloud.subprocess, 'run', side_effect=[error, None]) as run, \
+             mock.patch.object(cloud, 'download', return_value=b'data'), \
+             mock.patch.object(cloud.time, 'sleep'):
+            cloud.upload_verified('test:part', b'data')
+        self.assertEqual(run.call_count, 2)
+
+    def test_persistent_checksum_mismatch_fails(self):
+        with mock.patch.object(cloud.subprocess, 'run') as run, \
+             mock.patch.object(cloud, 'download', return_value=b'wrong'), \
+             mock.patch.object(cloud.time, 'sleep'):
+            with self.assertRaises(ValueError):
+                cloud.upload_verified('test:part', b'data')
+        self.assertEqual(run.call_count, 3)
+
+
 if __name__ == '__main__':
     unittest.main()

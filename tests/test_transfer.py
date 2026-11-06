@@ -92,6 +92,20 @@ class RestoreTests(unittest.TestCase):
         self.restore(apply=True)
         self.assertFalse((self.home / 'Documents/link').is_symlink())
 
+    def test_dry_run_displays_symlink_target(self):
+        archive = self.source / 'home.tar'
+        with tarfile.open(archive, 'w') as tar:
+            member = tarfile.TarInfo('Documents/link')
+            member.type = tarfile.SYMTYPE
+            member.linkname = '../other'
+            tar.addfile(member)
+        (self.source / 'manifest.json').write_text(json.dumps({'version': 1, 'sha256': transfer.digest(archive)}))
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            transfer.restore(argparse.Namespace(source=str(self.source), apply=False, include=None), self.home)
+        self.assertIn("'Documents/link' -> '../other'", output.getvalue())
+        self.assertFalse((self.home / 'Documents').exists())
+
     def test_missing_selection_rejected(self):
         self.archive([('Documents/a', b'hello')])
         with self.assertRaises(ValueError):

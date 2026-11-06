@@ -1,0 +1,2 @@
+# Keep scripts and configuration usable when copied from a Windows checkout.
+* text=auto eol=lf

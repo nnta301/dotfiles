@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 import uuid
 
 import transfer
@@ -61,10 +62,20 @@ def download(remote):
 
 
 def upload_verified(remote, data):
-    subprocess.run(['rclone', '--crypt-no-data-encryption=false', 'rcat', remote, '--size', str(len(data))], input=data, check=True)
-    received = download(remote)
-    if hashlib.sha256(received).digest() != hashlib.sha256(data).digest():
-        raise ValueError(f'Đọc lại từ OneDrive không khớp: {remote}')
+    # Retrying only the current object bounds network recovery without ever
+    # publishing an unchecked chunk. Each backup uses its own remote directory.
+    for attempt in range(1, 4):
+        try:
+            subprocess.run(['rclone', '--crypt-no-data-encryption=false', 'rcat', remote, '--size', str(len(data))], input=data, check=True)
+            received = download(remote)
+            if hashlib.sha256(received).digest() != hashlib.sha256(data).digest():
+                raise ValueError(f'Đọc lại từ OneDrive không khớp: {remote}')
+            return
+        except (subprocess.CalledProcessError, OSError, ValueError):
+            if attempt == 3:
+                raise
+            print(f'Upload/kiểm tra thất bại, thử lại phần hiện tại ({attempt}/3): {remote}', file=sys.stderr, flush=True)
+            time.sleep(attempt)
 
 
 class ChunkWriter:
@@ -326,7 +337,8 @@ def backup(args, home):
     finally:
         if paused:
             print('OneDrive sync vẫn đang DỪNG để tránh tải backup cloud về đầy ổ local. '
-                  'Chỉ bật lại sau khi loại thư mục backup khỏi phạm vi sync; xem docs/backup-restore.md.', flush=True)
+                  'Nếu service được enable, nó có thể tự chạy lại khi đăng nhập/reboot. '
+                  'Loại thư mục backup khỏi sync trước khi khởi động lại; xem docs/backup-restore.md.', flush=True)
 
 
 def restore(args, home):

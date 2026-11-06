@@ -28,7 +28,8 @@ Repo này **không** theo dõi toàn bộ cấu hình Hyprland. Thay vào đó, 
 │  Lớp 2: Repo Này — Cấu Hình Ghi Đè Cá Nhân                     │
 │  ├─ hypr/   → UserConfigs/ cá nhân                            │
 │  ├─ zsh/    → .zshrc với Oh-My-Zsh + tất cả alias cá nhân      │
-│  └─ nvim/   → Cấu hình LazyVim đầy đủ (độc lập với WM)         │
+│  ├─ nvim/   → Cấu hình LazyVim đầy đủ (độc lập với WM)         │
+│  └─ fcitx5/ → Profile bộ gõ tiếng Việt                         │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -102,9 +103,12 @@ Sau khi nền hoạt động, `./setup.sh` cài toàn bộ package chính thức
 ```
 dotfiles/
 ├── 📄 .gitignore                  ← Loại trừ secrets, cache và backup cá nhân
+├── 📄 .gitattributes              ← Giữ file text ở LF khi checkout
 ├── 📄 README.md                   ← File này
 ├── 📄 pkglist.txt                 ← Package chính thức và AUR được setup.sh cài
 ├── 📂 packages/                   ← Danh sách package ghi lại từ máy hiện tại
+├── 📂 docs/                       ← Hướng dẫn cài đặt và phục hồi
+├── 📂 tests/                      ← Kiểm thử script
 ├── 📄 setup.sh                    ← Cài nền, package và áp cấu hình
 │
 ├── 📂 hypr/                       ← Cấu hình Hyprland cá nhân

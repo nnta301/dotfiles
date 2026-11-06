@@ -174,7 +174,7 @@ def restore_tar(args, home, tar):
     files = []
     for m in chosen:
         if m.issym() or m.islnk():
-            print("SKIP liên kết (khôi phục bằng setup hoặc kiểm tra thủ công):", m.name)
+            print("SKIP liên kết (kiểm tra thủ công):", repr(m.name), "->", repr(m.linkname))
             continue
         check_parents(home, m.name)
         target = home / m.name

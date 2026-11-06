@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import tempfile
 import unittest
 
@@ -60,6 +61,36 @@ class SetupTests(unittest.TestCase):
             result = self.run_function(root, 'DOTFILES_DIR="$1"\nprepare_upstream_nvidia "$2"', REPO, upstream)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('nvidia-dkms', driver.read_text())
+
+    @unittest.skipUnless(shutil.which('stow'), 'GNU Stow missing')
+    def test_fcitx5_runtime_files_stay_out_of_checkout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); home = root / 'home'; home.mkdir()
+            repo = root / 'repo'; source = repo / 'fcitx5/.config/fcitx5'; source.mkdir(parents=True)
+            (source / 'profile').write_text('profile')
+            result = self.run_function(root, 'DOTFILES_DIR="$1"\nSTOW_PACKAGES=(fcitx5)\nstow_configs', repo)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            config = home / '.config/fcitx5'
+            self.assertFalse(config.is_symlink())
+            self.assertTrue((config / 'profile').is_symlink())
+            (config / 'runtime.conf').write_text('runtime')
+            self.assertFalse((source / 'runtime.conf').exists())
+
+    @unittest.skipUnless(shutil.which('stow'), 'GNU Stow missing')
+    def test_existing_folded_fcitx5_is_unfolded(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); home = root / 'home'; (home / '.config').mkdir(parents=True)
+            repo = root / 'repo'; source = repo / 'fcitx5/.config/fcitx5'; source.mkdir(parents=True)
+            (source / 'profile').write_text('profile')
+            subprocess.run(['stow', '-d', str(repo), '-t', str(home), 'fcitx5'], check=True)
+            config = home / '.config/fcitx5'
+            self.assertTrue(config.is_symlink())
+            result = self.run_function(root, 'DOTFILES_DIR="$1"\nSTOW_PACKAGES=(fcitx5)\nstow_configs', repo)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(config.is_symlink())
+            self.assertTrue((config / 'profile').is_symlink())
+            (config / 'runtime.conf').write_text('runtime')
+            self.assertFalse((source / 'runtime.conf').exists())
 
 
 if __name__ == '__main__':

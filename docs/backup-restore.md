@@ -57,13 +57,22 @@ Tùy chọn giới hạn home (thay toàn bộ danh sách mặc định, không 
 ./scripts/backup.sh --include Documents --include Code --include .ssh
 ```
 
-`/etc`, EFI, repo và báo cáo vẫn được lưu. Dữ liệu database/Docker volumes ngoài home không được tự export. Không phải snapshot nhất quán của ứng dụng đang chạy; file thay đổi lúc đọc có thể khiến script dừng.
+`/etc`, EFI, repo và báo cáo vẫn được lưu. Dữ liệu database/Docker volumes ngoài home không được tự export. Không phải snapshot nhất quán của ứng dụng đang chạy; file thay đổi hoặc biến mất lúc đọc sẽ làm backup dừng để tránh bỏ sót dữ liệu. Đóng ứng dụng, kiểm tra file rồi chạy lại. Mỗi chunk lỗi truyền/đọc lại được thử tối đa ba lần; backup không tiếp tục từ lần chạy cũ.
 
 Script dùng bộ nhớ cho các phần 64 MiB và một thư mục tạm nhỏ dưới `~/.cache/dotfiles-backup` cho báo cáo/Git bundle; vẫn cần dung lượng cho bundle, bộ nhớ và file tạm của công cụ. Không nén archive, nên không dựa vào giả định nén sẽ đủ chỗ.
 
 ### OneDrive sync sau backup
 
-**Script giữ dịch vụ sync ở trạng thái dừng**, kể cả khi upload lỗi sau khi đã dừng nó. Nếu bật lại ngay, client có thể tải cả thư mục backup cloud về và làm đầy ổ 70 GB. Trước khi bật lại, loại `ArchBackups` khỏi sync của cả Linux và Windows nếu có client chạy trên hai hệ điều hành.
+**Script chỉ dừng dịch vụ sync trong phiên hiện tại**, kể cả khi upload lỗi sau khi đã dừng nó; không disable service. Nếu service được enable, nó có thể tự khởi động lại sau đăng nhập hoặc reboot. Trước khi reboot thử USB rồi quay lại Arch, loại `ArchBackups` khỏi sync và kiểm tra filter; nếu chưa làm được, tạm ngăn service khởi động bằng các lệnh dưới đây. Nếu bật lại ngay, client có thể tải cả thư mục backup cloud về và làm đầy ổ 70 GB. Trước khi bật lại, loại `ArchBackups` khỏi sync của cả Linux và Windows nếu có client chạy trên hai hệ điều hành.
+
+Trong terminal Arch cũ, xem trạng thái và ghi lại kết quả trước khi thay đổi:
+
+```bash
+systemctl --user is-enabled onedrive.service
+systemctl --user is-active onedrive.service
+```
+
+Nếu chưa cấu hình được filter mà phải reboot, tạm chạy `systemctl --user disable --now onedrive.service`. Lệnh này thay đổi cấu hình tự khởi động; chỉ bật lại bằng `systemctl --user enable --now onedrive.service` khi filter đã được xác minh và trước đó bạn muốn service tự khởi động. Nó không ngăn client chạy thủ công hay trên Windows.
 
 Với client abraunegg trên Linux, kiểm tra `~/.config/onedrive/config` và các bộ lọc đang có. Thêm `/ArchBackups` vào `skip_dir`, giữ lại các mục cũ, không thay toàn bộ danh sách nếu đã cấu hình. Thay đổi filter có thể yêu cầu `--resync`; kiểm tra bằng dry-run và theo [tài liệu client](https://github.com/abraunegg/onedrive/blob/master/docs/usage.md#using-client-side-filtering-rules-to-determine-what-should-be-synced-with-microsoft-onedrive). Chỉ khi cấu hình đúng mới chạy `systemctl --user start onedrive.service`. Script không tự sửa bộ lọc hoặc chạy resync dữ liệu cá nhân.
 
@@ -76,7 +85,7 @@ rclone lsf archbackup: --dirs-only
 ./scripts/restore.sh archbackup:arch-20261105T010000Z-abcdefgh --dry-run
 ```
 
-Đổi ID ví dụ. Dry-run đọc/giải mã và kiểm tra **tất cả archive**, liệt kê dữ liệu home sẽ khôi phục, không ghi vào home. Việc này tải dữ liệu qua mạng nên có thể lâu. Tên trên giao diện web OneDrive đã mã hóa; dùng rclone qua `archbackup:` để xem tên thật.
+Đổi ID ví dụ. Dry-run đọc/giải mã và kiểm tra **tất cả archive**, liệt kê dữ liệu home sẽ khôi phục, không ghi vào home. Việc này tải dữ liệu qua mạng nên có thể lâu. Mỗi lần dry-run và apply đều kiểm tra lại toàn bộ archive; việc quét tar và restore có thể tải lại nhiều chunk, kể cả khi chỉ chọn `--include .ssh`. Dự trù băng thông và thời gian, không bỏ qua verify. Tên trên giao diện web OneDrive đã mã hóa; dùng rclone qua `archbackup:` để xem tên thật.
 
 Nếu không có manifest hoặc checksum lỗi, chưa có bản hoàn tất để cài lại. Script không tự xóa bản dở dang, không resume lần chạy cũ; chạy lại tạo ID khác và cần quota cho cả hai. Chỉ xóa đúng bản dở dang sau khi nhận diện chắc chắn, không xóa cả thư mục ArchBackups.
 
@@ -93,7 +102,15 @@ Archive hệ thống được lưu thành các phần mã hóa, không thể t�
 
 Thư mục đích phải **chưa tồn tại**. Trước khi tạo thư mục, script kiểm tra đủ chỗ cho tổng archive hệ thống cộng 64 MiB dự phòng. Lệnh kiểm tra và tải `efi.tar`, `etc.tar`, `repo.tar`, `metadata.tar`, không phục hồi vào hệ thống. Mỗi archive chỉ được đặt tên hoàn chỉnh sau khi tải xong và kiểm tra checksum; lỗi có thể để lại thư mục đích với các archive đã hoàn thành, hãy dùng thư mục mới khi thử lại. `metadata.tar` chứa `reports/`, `REPORT.txt` và Git bundle. Mở/giải nén vào thư mục riêng để đọc; không giải nén đè `/etc` hay EFI. Lệnh này không kiểm tra archive home; cần dry-run đầy đủ ở bước 3 trước khi format.
 
-**Nếu đang ở USB Arch live:** cần mạng; có thể cài công cụ vào môi trường live (không phải `/mnt`):
+**Nếu đang ở USB Arch live:** cần mạng. Kiểm tra vùng ghi live và `/tmp` trước vì cả cài package lẫn export có thể dùng RAM/tmpfs:
+
+```bash
+df -h / /tmp
+df -h /run/archiso/cowspace
+```
+
+Nếu đường dẫn cowspace không tồn tại, kiểm tra mount bằng `findmnt` và dừng nếu không xác định được dung lượng. Nếu thiếu, xem [ArchWiki archiso](https://wiki.archlinux.org/title/Archiso#Adjusting_the_size_of_the_CoW_space) để điều chỉnh `cow_spacesize` phù hợp RAM; không mặc định 1 GiB luôn đủ. Cài công cụ **chỉ trong môi trường live tạm**, không phải `/mnt`:
+
 
 ```bash
 pacman -Sy --needed python git rclone
@@ -102,9 +119,11 @@ cd /tmp/dotfiles
 rclone config
 ```
 
+Lệnh `pacman -Sy` ở đây chỉ dành cho live ISO tạm để cài công cụ cứu hộ; không áp dụng cách cập nhật một phần này cho hệ thống Arch đã cài. Nếu lỗi dependency hoặc không đủ vùng ghi, dừng và xử lý live ISO, không tiếp tục format.
+
 Tạo lại `onedrive` và `archbackup` đúng hướng dẫn bước 1 với mật khẩu/salt đã lưu; nếu không có trình duyệt, theo luồng xác thực headless của rclone trên thiết bị khác. Sau đó chạy `restore.sh ... --export-system /tmp/arch-rescue` như trên. **Chỉ chế độ export-system cho phép root trong USB**; backup/restore home vẫn cần user thường. Kiểm tra `df -h /tmp` vì bộ nhớ live có hạn; nếu không đủ hoặc chưa tải được backup thì dừng trước khi format.
 
-Repo trên GitHub phải có script mới trước khi clone từ USB. Nếu chưa push, giữ thêm bộ script hiện tại trên Windows/thiết bị khác để dùng. Đừng xóa Arch khi công cụ giải mã/phục hồi duy nhất còn nằm trong Arch.
+Repo trên GitHub phải có script mới trước khi clone từ USB. Nếu chưa push, giữ thêm checkout trên Windows/thiết bị khác; `.gitattributes` yêu cầu LF cho file text khi checkout mới. Khi chép qua filesystem Windows có thể mất bit thực thi: trong USB dùng `bash ./scripts/restore.sh ...` hoặc kiểm tra nội dung và `chmod +x scripts/restore.sh` sau khi chép. Nếu bản checkout được tạo trước `.gitattributes` còn CRLF, tạo lại bản sao từ commit có `.gitattributes` rồi kiểm tra trước, không chỉnh tự động lên bản duy nhất. Đừng xóa Arch khi công cụ giải mã/phục hồi duy nhất còn nằm trong Arch.
 
 ## 5. Restore sau cài mới
 
@@ -115,7 +134,7 @@ Sau khi cài Arch và hoàn tất `setup.sh`, cấu hình lại hai remote như 
 ./scripts/restore.sh archbackup:arch-20261105T010000Z-abcdefgh --apply
 ```
 
-Mặc định chỉ phục hồi các mục cấp đầu không ẩn để giữ cấu hình mới. Mỗi file được tải hoàn chỉnh vào file tạm và kiểm tra kích thước trước khi chuyển file trùng vào `~/.restore-backup-*` rồi thay thế; không xóa file thừa. Lỗi tải file hiện tại không làm mất file cũ. Thư mục mới, kể cả các thư mục cha trung gian, được tạo với quyền tối đa 700; thư mục đã tồn tại giữ quyền cũ, file thuộc user mới và giữ mode thường, bỏ setuid/setgid; không phục hồi ACL/xattrs/owner cũ cho home. Symlink trong archive được báo bỏ qua khi restore. Các file hardlink trong home được backup thành các file riêng, vì vậy nội dung có thể được phục hồi nhưng mối liên kết giữa chúng không được giữ. Mất mạng giữa chừng có thể để lại một phần đã restore; kiểm tra home và bản sao file cũ, không có rollback toàn bộ.
+Mặc định chỉ phục hồi các mục cấp đầu không ẩn để giữ cấu hình mới. Mỗi file được tải hoàn chỉnh vào file tạm và kiểm tra kích thước trước khi chuyển file trùng vào `~/.restore-backup-*` rồi thay thế; không xóa file thừa. Lỗi tải file hiện tại không làm mất file cũ. Thư mục mới, kể cả các thư mục cha trung gian, được tạo với quyền tối đa 700; thư mục đã tồn tại giữ quyền cũ, file thuộc user mới và giữ mode thường, bỏ setuid/setgid; không phục hồi ACL/xattrs/owner cũ cho home. Symlink trong archive được báo bỏ qua khi restore; dry-run in tên và đích liên kết để kiểm tra thủ công. Không tự tạo lại link tuyệt đối hoặc trỏ ra ngoài home khi chưa xác định đích. Các file hardlink trong home được backup thành các file riêng, vì vậy nội dung có thể được phục hồi nhưng mối liên kết giữa chúng không được giữ. Mất mạng giữa chừng có thể để lại một phần đã restore; kiểm tra home và bản sao file cũ, không có rollback toàn bộ.
 
 Muốn lấy SSH keys hoặc một cấu hình cụ thể, chọn riêng:
 

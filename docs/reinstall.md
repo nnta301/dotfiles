@@ -19,7 +19,7 @@ cd ~/Documents/dotfiles
 
 Đường dẫn trên ứng với repo hiện tại; thay `cd` nếu clone ở nơi khác. Nhập mật khẩu sudo khi được hỏi. Script tự lưu home, repo chưa commit, Git bundle, báo cáo máy, `/etc`, EFI; gửi từng phần mã hóa rồi tải lại kiểm tra. Không cần các bước tar hoặc git bundle thủ công.
 
-Ghi lại đích được in, ví dụ `archbackup:arch-20261105T010000Z-abcdefgh`. Nếu lỗi, chưa dùng bản đó để format; không có manifest hoàn tất thì chưa phải bản backup đầy đủ. Script giữ OneDrive sync dừng để tránh tải cả backup ngược về ổ local. Xem [cách loại ArchBackups khỏi sync](backup-restore.md#onedrive-sync-sau-backup) trước khi bật lại client, kể cả trên Windows.
+Ghi lại đích được in, ví dụ `archbackup:arch-20261105T010000Z-abcdefgh`. Nếu lỗi, chưa dùng bản đó để format; không có manifest hoàn tất thì chưa phải bản backup đầy đủ. Script dừng OneDrive sync trong phiên hiện tại; service vẫn có thể tự chạy lại sau reboot nếu đang enable. Cấu hình filter hoặc tạm disable như hướng dẫn trước khi reboot để tránh tải backup ngược về ổ local. Xem [cách loại ArchBackups khỏi sync](backup-restore.md#onedrive-sync-sau-backup) trước khi bật lại client, kể cả trên Windows.
 
 Database/Docker volumes ngoài home phải xuất riêng nếu có dữ liệu cần giữ. Cache, filesystem con và đích symlink không được tự lưu; xem báo cáo. Dữ liệu OneDrive chỉ có trên cloud không được coi là bản sao local đã nằm trong archive.
 
@@ -72,6 +72,6 @@ Cấu hình lại rclone/crypt bằng **cùng mật khẩu và salt**, sau đó:
 ./scripts/restore.sh archbackup:arch-20261105T010000Z-abcdefgh --apply
 ```
 
-Mặc định phục hồi dữ liệu không ẩn; muốn cấu hình/khóa, dùng `--include .ssh` hoặc đường dẫn cụ thể sau khi xem trước. File trùng được giữ ở `~/.restore-backup-*`; không tự phục hồi `/etc`, EFI hay database. Nếu muốn lấy repo chưa push, export hệ thống rồi mở `repo.tar` vào thư mục riêng trống, kiểm tra và chạy setup từ bản đó.
+Mặc định phục hồi dữ liệu không ẩn; muốn cấu hình/khóa, dùng `--include .ssh` hoặc đường dẫn cụ thể sau khi xem trước. File trùng được giữ ở `~/.restore-backup-*`; không tự phục hồi `/etc`, EFI hay database. Repo cũ có thể đã nằm trong dữ liệu home restore tại `~/Documents/dotfiles`, trong khi clone mới ở `~/dotfiles`. Không tự ghi đè hoặc xóa bản nào: so sánh `git status`, `git log` và thay đổi cần giữ trong cả hai. Nếu cần nội dung chưa push hoặc bản home không có repo, export hệ thống rồi mở `repo.tar` vào thư mục riêng trống, kiểm tra trước khi chọn một checkout chính và chạy setup từ bản đó.
 
 Đăng nhập lại dịch vụ, kiểm tra project, tài liệu, bộ gõ, màn hình và cả Windows/Arch. Không bật OneDrive sync cả thư mục ArchBackups và không xóa backup cho đến khi xác nhận đầy đủ. Xem [chi tiết restore và giới hạn](backup-restore.md), [các bước sau setup](manual-steps.md).

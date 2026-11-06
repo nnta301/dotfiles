@@ -44,6 +44,14 @@ pacman -Qqem > packages/explicit-foreign.txt
 pacman -Qqm > packages/all-foreign.txt
 ```
 
+Snapshot chỉ phản ánh máy, **không tự thay đổi** danh sách cài của setup. Đối chiếu rồi thêm gói chính thức vào `pkglist.txt`; với gói AUR thêm tiền tố `aur/`, không đưa tên package local không tồn tại trên AUR vào tự động. Có thể xem các gói chính thức đã cài nhưng chưa có trong danh sách:
+
+```bash
+comm -23 <(sort -u packages/explicit-repo.txt) <(awk '{sub(/#.*/, ""); for (i=1; i<=NF; i++) if ($i !~ /^aur\//) print $i}' pkglist.txt | sort -u)
+```
+
+Với Flatpak, xem `flatpak list --app --columns=application`, rồi so sánh/chỉnh `packages/flatpak-apps.txt`. Lưu ý lệnh liệt kê có thể gồm ứng dụng cài system và user, còn setup cài từ Flathub cho user; không ghi đè danh sách nếu chưa xem nguồn và ID.
+
 ---
 
 ## ⌨️ Kiểm tra phím tắt Hyprland

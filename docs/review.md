@@ -4,6 +4,8 @@
 
 Đã xử lý thêm: từ chối crypt tắt mã hóa nội dung; chặn từng lựa chọn home tường minh bị loại; export kiểm tra dung lượng và chỉ đặt tên file hoàn chỉnh sau checksum; tạo từng thư mục restore mới với quyền 700; bổ sung ignore cho cấu hình và archive backup; bỏ luồng tạo backup local trùng lặp nhưng giữ restore backup cũ. `rclone` và `config` có thể chứa bí mật; `.gitignore` chỉ giảm nguy cơ, không thay việc kiểm tra `git diff --cached` trước commit.
 
+Ngày 06/11/2026, [Arch Extra cung cấp Hyprland 0.57.1](https://archlinux.org/packages/extra/x86_64/hyprland/), trong khi máy cũ đã kiểm tra trên 0.56.2; chưa xác nhận overlay chạy trên 0.57.1. Theo thông báo upstream, JaKooLit đã chuyển bảo trì; bản gốc cũ có thể không tương thích Arch/Hyprland mới, còn LinuxBeginnings có thay đổi cấu hình lớn. Chưa kiểm thử toàn bộ overlay `.conf` với bản mới; không tự chuyển fork hoặc ghim revision chưa kiểm chứng. Cần thử VM/cài mới trước khi xóa hệ thống đang dùng.
+
 Installer JaKooLit vẫn tải nhánh hiện hành. Chưa ghim revision vì chưa kiểm thử cài mới một revision cụ thể; xem đây là giới hạn cần xử lý trước khi format. Wiki Hyprland hiện tại dùng cú pháp mới, liên kết phiên bản cũ vẫn giữ cho các lệnh đang được hướng dẫn.
 
 ## Đối chiếu audit bổ sung
@@ -23,7 +25,7 @@ Setup chỉ sửa thông báo NVIDIA đúng mẫu đã kiểm tra và từ chố
 
 ## Đối chiếu upstream và giới hạn
 
-Đã đối chiếu tên 183 gói chính thức với database Core/Extra tải từ mirror Arch, và 23 gói AUR qua RPC. Sau đổi tên IntelliJ, các tên gói đều có trong nguồn tương ứng tại thời điểm kiểm tra. Đây là kiểm tra sự tồn tại, không chứng minh tất cả gói build/cài thành công cùng nhau. AUR đang đánh dấu outdated cho `hyde-cli-git`, `teamviewer`, `zsh-theme-powerlevel10k-git`; giữ nguyên theo danh sách ứng dụng đã chọn, cần đọc PKGBUILD và lỗi build nếu phát sinh.
+Trong lần rà soát ngày 05/11/2026, đã đối chiếu 183 gói chính thức với database Core/Extra và 23 gói AUR qua RPC; con số và cờ outdated chỉ là ảnh chụp của lần kiểm tra đó, không phản ánh danh sách hoặc kho hiện tại. Sau đổi tên IntelliJ, các tên gói đều có trong nguồn tương ứng tại thời điểm kiểm tra. Đây là kiểm tra sự tồn tại, không chứng minh tất cả gói build/cài thành công cùng nhau. AUR đang đánh dấu outdated cho `hyde-cli-git`, `teamviewer`, `zsh-theme-powerlevel10k-git`; giữ nguyên theo danh sách ứng dụng đã chọn, cần đọc PKGBUILD và lỗi build nếu phát sinh.
 
 JaKooLit thông báo chuyển bảo trì sang LinuxBeginnings. Script NVIDIA của hai nguồn được kiểm tra vẫn chứa `nvidia-dkms`; setup hiện có điều chỉnh có kiểm tra cho máy dùng `nvidia-open`. Chưa chuyển fork tự động vì chưa thử bộ cấu hình mới với overlay này. Việc installer kết thúc và tạo `hyprland.conf` không đủ chứng minh mọi thành phần cài thành công: vẫn cần xem log, khởi động thử desktop rồi mới áp overlay.
 
