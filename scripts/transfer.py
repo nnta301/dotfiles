@@ -190,7 +190,7 @@ def restore_tar(args, home, tar):
         files.append(m)
     if not args.apply:
         for m in files:
-            print("WOULD RESTORE:", m.name)
+            print("WOULD RESTORE:", repr(m.name))
         print(f"Dry-run: {len(files)} mục; chưa thay đổi home. Thêm --apply để thực hiện.")
         return
     required = sum(m.size for m in files if m.isfile())

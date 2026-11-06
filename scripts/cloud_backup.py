@@ -53,29 +53,51 @@ def remote_info(remote):
     return drive + ':', underlying.split(':', 1)[1].strip('/')
 
 
+# Backoff applies after each failed attempt; rclone may also retry internally.
+RETRY_DELAYS = (30, 120, 300)
+
+
+def retry_transfer(operation, label):
+    for attempt in range(len(RETRY_DELAYS) + 1):
+        try:
+            return operation()
+        except (FileNotFoundError, PermissionError):
+            raise
+        except (subprocess.CalledProcessError, OSError) as exc:
+            if attempt == len(RETRY_DELAYS):
+                raise
+            delay = RETRY_DELAYS[attempt]
+            print(f'{label} thất bại ({type(exc).__name__}); thử lại sau {delay} giây '
+                  f'({attempt + 1}/{len(RETRY_DELAYS)}). Ctrl+C để dừng.', file=sys.stderr, flush=True)
+            time.sleep(delay)
+
+
 def download(remote):
-    # A corrupt remote object must not exhaust RAM before its checksum is checked.
-    data = subprocess.check_output(['rclone', '--crypt-no-data-encryption=false', 'cat', remote, '--count', str(CHUNK + 1)])
+    # Bound output even if the remote object is corrupt. Retry command/network
+    # failures only; validation failures must not be mistaken for success.
+    data = retry_transfer(
+        lambda: subprocess.check_output(['rclone', '--crypt-no-data-encryption=false', 'cat', remote, '--count', str(CHUNK + 1)]),
+        f'Tải {remote}')
     if len(data) > CHUNK:
         raise ValueError(f'Đối tượng cloud vượt giới hạn {CHUNK} byte: {remote}')
     return data
 
 
 def upload_verified(remote, data):
-    # Retrying only the current object bounds network recovery without ever
-    # publishing an unchecked chunk. Each backup uses its own remote directory.
-    for attempt in range(1, 4):
-        try:
-            subprocess.run(['rclone', '--crypt-no-data-encryption=false', 'rcat', remote, '--size', str(len(data))], input=data, check=True)
-            received = download(remote)
-            if hashlib.sha256(received).digest() != hashlib.sha256(data).digest():
-                raise ValueError(f'Đọc lại từ OneDrive không khớp: {remote}')
+    # Retry upload and read-back separately, avoiding nested network retries.
+    # A checksum mismatch starts a new upload; it never publishes success.
+    for attempt in range(len(RETRY_DELAYS) + 1):
+        retry_transfer(
+            lambda: subprocess.run(['rclone', '--crypt-no-data-encryption=false', 'rcat', remote, '--size', str(len(data))], input=data, check=True),
+            f'Upload {remote}')
+        received = download(remote)
+        if hashlib.sha256(received).digest() == hashlib.sha256(data).digest():
             return
-        except (subprocess.CalledProcessError, OSError, ValueError):
-            if attempt == 3:
-                raise
-            print(f'Upload/kiểm tra thất bại, thử lại phần hiện tại ({attempt}/3): {remote}', file=sys.stderr, flush=True)
-            time.sleep(attempt)
+        if attempt == len(RETRY_DELAYS):
+            raise ValueError(f'Đọc lại từ OneDrive không khớp: {remote}')
+        delay = RETRY_DELAYS[attempt]
+        print(f'Checksum upload không khớp; thử lại sau {delay} giây ({attempt + 1}/{len(RETRY_DELAYS)}).', file=sys.stderr, flush=True)
+        time.sleep(delay)
 
 
 class ChunkWriter:
@@ -328,7 +350,7 @@ def backup(args, home):
             manifest = {'version': 2, 'created': datetime.now(timezone.utc).isoformat(),
                         'archives': archives, 'paths': selected, 'skipped': skipped, 'symlinks': links,
                         'warnings': warnings}
-            upload_verified(remote + '/manifest.json', (json.dumps(manifest, ensure_ascii=False, indent=2) + '\n').encode())
+            upload_verified(remote + '/manifest.json', (json.dumps(manifest, ensure_ascii=True, indent=2) + '\n').encode())
             print('BACKUP CLOUD ĐÃ UPLOAD VÀ ĐỌC LẠI ĐẦY ĐỦ:', remote)
             print('\n'.join(warnings))
     except BaseException:
@@ -336,9 +358,9 @@ def backup(args, home):
         raise
     finally:
         if paused:
-            print('OneDrive sync vẫn đang DỪNG để tránh tải backup cloud về đầy ổ local. '
-                  'Nếu service được enable, nó có thể tự chạy lại khi đăng nhập/reboot. '
-                  'Loại thư mục backup khỏi sync trước khi khởi động lại; xem docs/backup-restore.md.', flush=True)
+            print('Đã dừng OneDrive sync trong phiên này.', flush=True)
+        print('Service OneDrive có thể tự chạy khi đăng nhập/reboot nếu đang enable, kể cả khi trước backup nó chưa chạy. '
+              'Loại thư mục backup khỏi sync trước khi khởi động lại; xem docs/backup-restore.md.', flush=True)
 
 
 def restore(args, home):

@@ -47,8 +47,16 @@ pacman -Qqm > packages/all-foreign.txt
 Snapshot chỉ phản ánh máy, **không tự thay đổi** danh sách cài của setup. Đối chiếu rồi thêm gói chính thức vào `pkglist.txt`; với gói AUR thêm tiền tố `aur/`, không đưa tên package local không tồn tại trên AUR vào tự động. Có thể xem các gói chính thức đã cài nhưng chưa có trong danh sách:
 
 ```bash
-comm -23 <(sort -u packages/explicit-repo.txt) <(awk '{sub(/#.*/, ""); for (i=1; i<=NF; i++) if ($i !~ /^aur\//) print $i}' pkglist.txt | sort -u)
+comm -23 <(LC_ALL=C sort -u packages/explicit-repo.txt) <(awk '{sub(/#.*/, ""); for (i=1; i<=NF; i++) if ($i !~ /^aur\//) print $i}' pkglist.txt | LC_ALL=C sort -u)
 ```
+
+Đối chiếu tiếp gói ngoài kho chính thức với các mục `aur/` (chạy trong Bash hoặc Zsh):
+
+```bash
+comm -23 <(LC_ALL=C sort -u packages/explicit-foreign.txt) <(awk '{sub(/#.*/, ""); for (i=1; i<=NF; i++) if ($i ~ /^aur\//) {sub(/^aur\//, "", $i); print $i}}' pkglist.txt | LC_ALL=C sort -u)
+```
+
+Kết quả chỉ là gói chưa được liệt kê, không chứng minh chúng có trên AUR hoặc phải cài lại. Xem từng gói và kiểm tra nguồn trước khi thêm.
 
 Với Flatpak, xem `flatpak list --app --columns=application`, rồi so sánh/chỉnh `packages/flatpak-apps.txt`. Lưu ý lệnh liệt kê có thể gồm ứng dụng cài system và user, còn setup cài từ Flathub cho user; không ghi đè danh sách nếu chưa xem nguồn và ID.
 

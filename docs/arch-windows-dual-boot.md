@@ -370,6 +370,8 @@ ping -c 3 archlinux.org
 sudo -v
 ```
 
+Nếu `sudo -v` thất bại, kiểm tra cấu hình wheel bằng tài khoản root trước khi tiếp tục.
+
 Kiểm tra đồng hồ và đồng bộ mạng sau khi đã kết nối (trong Arch mới, không chạy trong chroot):
 
 ```bash
@@ -380,7 +382,7 @@ timedatectl status
 
 Nếu `set-ntp` báo không có dịch vụ NTP, kiểm tra dịch vụ đồng bộ thời gian đang cài; không tiếp tục với đồng hồ sai. Dual boot Windows mặc định có thể dùng RTC theo giờ địa phương, còn Arch mặc định dùng UTC, gây lệch giờ. [ArchWiki khuyến nghị cấu hình Windows dùng UTC](https://wiki.archlinux.org/title/System_time#UTC_in_Microsoft_Windows); làm theo hướng dẫn đó trên Windows bằng quyền administrator, rồi xác minh thời gian trên cả hai hệ điều hành. Nếu không muốn sửa Windows, xem tùy chọn RTC localtime và giới hạn của nó trong cùng tài liệu; không chạy `timedatectl` trong chroot.
 
-Nếu `sudo -v` thất bại, kiểm tra cấu hình wheel bằng tài khoản root trước khi tiếp tục. Cập nhật toàn hệ thống và cài công cụ cơ bản:
+Cập nhật toàn hệ thống và cài công cụ cơ bản:
 
 ```bash
 sudo pacman -Syu

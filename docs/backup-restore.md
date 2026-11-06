@@ -57,7 +57,7 @@ Tùy chọn giới hạn home (thay toàn bộ danh sách mặc định, không 
 ./scripts/backup.sh --include Documents --include Code --include .ssh
 ```
 
-`/etc`, EFI, repo và báo cáo vẫn được lưu. Dữ liệu database/Docker volumes ngoài home không được tự export. Không phải snapshot nhất quán của ứng dụng đang chạy; file thay đổi hoặc biến mất lúc đọc sẽ làm backup dừng để tránh bỏ sót dữ liệu. Đóng ứng dụng, kiểm tra file rồi chạy lại. Mỗi chunk lỗi truyền/đọc lại được thử tối đa ba lần; backup không tiếp tục từ lần chạy cũ.
+`/etc`, EFI, repo và báo cáo vẫn được lưu. Dữ liệu database/Docker volumes ngoài home không được tự export. Không phải snapshot nhất quán của ứng dụng đang chạy; file thay đổi hoặc biến mất lúc đọc sẽ làm backup dừng để tránh bỏ sót dữ liệu. Đóng ứng dụng, kiểm tra file rồi chạy lại. Mỗi lần truyền hoặc tải lại gặp lỗi được thử tối đa bốn lần, với khoảng chờ 30 giây, 2 phút và 5 phút giữa các lần (rclone có thể tự retry thêm); Ctrl+C để hủy. Checksum sai không bao giờ được chấp nhận; backup không tiếp tục từ lần chạy cũ.
 
 Script dùng bộ nhớ cho các phần 64 MiB và một thư mục tạm nhỏ dưới `~/.cache/dotfiles-backup` cho báo cáo/Git bundle; vẫn cần dung lượng cho bundle, bộ nhớ và file tạm của công cụ. Không nén archive, nên không dựa vào giả định nén sẽ đủ chỗ.
 
@@ -74,6 +74,8 @@ systemctl --user is-active onedrive.service
 
 Nếu chưa cấu hình được filter mà phải reboot, tạm chạy `systemctl --user disable --now onedrive.service`. Lệnh này thay đổi cấu hình tự khởi động; chỉ bật lại bằng `systemctl --user enable --now onedrive.service` khi filter đã được xác minh và trước đó bạn muốn service tự khởi động. Nó không ngăn client chạy thủ công hay trên Windows.
 
+**Trên Windows**, kiểm tra đúng tài khoản OneDrive: chọn biểu tượng đám mây ở khay hệ thống → bánh răng **Settings** → **Account** → **Choose folders**, bỏ chọn `ArchBackups` rồi xác nhận. Theo [Microsoft](https://support.microsoft.com/en-gb/onedrive/choose-which-onedrive-folders-you-want-to-sync-on-windows-or-macos), bỏ chọn sẽ xóa bản local của thư mục đó khỏi máy Windows nhưng giữ bản trên cloud; trước đó phải xác nhận upload đã hoàn tất và không có file local chưa sync cần giữ. Thiết lập này áp dụng riêng cho từng máy/tài khoản. Nếu chưa chắc trạng thái, tạm dừng sync và kiểm tra trước khi thay đổi.
+
 Với client abraunegg trên Linux, kiểm tra `~/.config/onedrive/config` và các bộ lọc đang có. Thêm `/ArchBackups` vào `skip_dir`, giữ lại các mục cũ, không thay toàn bộ danh sách nếu đã cấu hình. Thay đổi filter có thể yêu cầu `--resync`; kiểm tra bằng dry-run và theo [tài liệu client](https://github.com/abraunegg/onedrive/blob/master/docs/usage.md#using-client-side-filtering-rules-to-determine-what-should-be-synced-with-microsoft-onedrive). Chỉ khi cấu hình đúng mới chạy `systemctl --user start onedrive.service`. Script không tự sửa bộ lọc hoặc chạy resync dữ liệu cá nhân.
 
 ## 3. Kiểm tra backup trước khi xóa Arch
@@ -85,7 +87,7 @@ rclone lsf archbackup: --dirs-only
 ./scripts/restore.sh archbackup:arch-20261105T010000Z-abcdefgh --dry-run
 ```
 
-Đổi ID ví dụ. Dry-run đọc/giải mã và kiểm tra **tất cả archive**, liệt kê dữ liệu home sẽ khôi phục, không ghi vào home. Việc này tải dữ liệu qua mạng nên có thể lâu. Mỗi lần dry-run và apply đều kiểm tra lại toàn bộ archive; việc quét tar và restore có thể tải lại nhiều chunk, kể cả khi chỉ chọn `--include .ssh`. Dự trù băng thông và thời gian, không bỏ qua verify. Tên trên giao diện web OneDrive đã mã hóa; dùng rclone qua `archbackup:` để xem tên thật.
+Đổi ID ví dụ. Dry-run đọc/giải mã và kiểm tra **tất cả archive**, liệt kê dữ liệu home sẽ khôi phục, không ghi vào home. Việc này tải dữ liệu qua mạng nên có thể lâu. Lỗi tải tạm thời được thử lại theo các khoảng chờ trên; checksum sai vẫn làm lệnh dừng. Mỗi lần dry-run và apply đều kiểm tra lại toàn bộ archive; việc quét tar và restore có thể tải lại nhiều chunk, kể cả khi chỉ chọn `--include .ssh`. Dự trù băng thông và thời gian, không bỏ qua verify. Tên trên giao diện web OneDrive đã mã hóa; dùng rclone qua `archbackup:` để xem tên thật.
 
 Nếu không có manifest hoặc checksum lỗi, chưa có bản hoàn tất để cài lại. Script không tự xóa bản dở dang, không resume lần chạy cũ; chạy lại tạo ID khác và cần quota cho cả hai. Chỉ xóa đúng bản dở dang sau khi nhận diện chắc chắn, không xóa cả thư mục ArchBackups.
 
@@ -109,7 +111,7 @@ df -h / /tmp
 df -h /run/archiso/cowspace
 ```
 
-Nếu đường dẫn cowspace không tồn tại, kiểm tra mount bằng `findmnt` và dừng nếu không xác định được dung lượng. Nếu thiếu, xem [ArchWiki archiso](https://wiki.archlinux.org/title/Archiso#Adjusting_the_size_of_the_CoW_space) để điều chỉnh `cow_spacesize` phù hợp RAM; không mặc định 1 GiB luôn đủ. Cài công cụ **chỉ trong môi trường live tạm**, không phải `/mnt`:
+Nếu đường dẫn cowspace không tồn tại, kiểm tra mount bằng `findmnt` và dừng nếu không xác định được dung lượng. Nếu thiếu, xem [ArchWiki archiso](https://wiki.archlinux.org/title/Archiso) để điều chỉnh `cow_spacesize` phù hợp RAM; không mặc định 1 GiB luôn đủ. Cài công cụ **chỉ trong môi trường live tạm**, không phải `/mnt`:
 
 
 ```bash

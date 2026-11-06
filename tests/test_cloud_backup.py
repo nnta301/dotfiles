@@ -220,6 +220,49 @@ class CloudTests(unittest.TestCase):
                 self.assertEqual(tar.extractfile('Documents/hello').read(), b'valuable')
             self.assertEqual(list(home.rglob('home.tar')), [])
 
+    @unittest.skipUnless(os.name == 'posix', 'requires non-UTF-8 POSIX filename')
+    def test_non_utf8_name_roundtrip_and_dry_run(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp) / 'source'; home.mkdir()
+            raw_path = os.fsencode(home) + b'/name-\xff'
+            with open(raw_path, 'wb') as output:
+                output.write(b'valuable')
+            def prepare(out, repo, archive_func):
+                for name in ['repo.tar', 'etc.tar', 'efi.tar']:
+                    archive_func(home, out / name)
+                return []
+            args = argparse.Namespace(remote='test:', include=None)
+            with mock.patch.object(cloud, 'remote_info', return_value=('drive:', 'ArchBackups')), \
+                 mock.patch.object(cloud.subprocess, 'check_output', return_value=json.dumps({'free': 10 * 1024**3})), \
+                 mock.patch.object(cloud.transfer, 'pause_onedrive', return_value=False), \
+                 mock.patch.object(cloud.transfer, 'prepare_system_backup', side_effect=prepare):
+                cloud.backup(args, home)
+            manifest_path = next(name for name in self.remote if name.endswith('/manifest.json'))
+            manifest = json.loads(self.remote[manifest_path].decode('utf-8'))
+            self.assertEqual(os.fsencode(manifest['paths'][0]), b'name-\xff')
+            target = Path(tmp) / 'target'; target.mkdir()
+            output = io.TextIOWrapper(io.BytesIO(), encoding='utf-8', errors='strict')
+            with mock.patch.object(cloud, 'remote_info'), contextlib.redirect_stdout(output):
+                cloud.restore(argparse.Namespace(source=manifest_path.rsplit('/', 1)[0], export_system=None, apply=False, include=None), target)
+            self.assertEqual(list(target.iterdir()), [])
+            with mock.patch.object(cloud, 'remote_info'), contextlib.redirect_stdout(output):
+                cloud.restore(argparse.Namespace(source=manifest_path.rsplit('/', 1)[0], export_system=None, apply=True, include=None), target)
+            with open(os.fsencode(target) + b'/name-\xff', 'rb') as restored:
+                self.assertEqual(restored.read(), b'valuable')
+
+    def test_warns_sync_may_restart_when_initially_inactive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp); (home / 'data').write_text('test')
+            output = io.StringIO()
+            with mock.patch.object(cloud, 'remote_info', return_value=('drive:', 'ArchBackups')), \
+                 mock.patch.object(cloud.subprocess, 'check_output', return_value=json.dumps({'free': 10 * 1024**3})), \
+                 mock.patch.object(cloud.transfer, 'pause_onedrive', return_value=False), \
+                 mock.patch.object(cloud.transfer, 'prepare_system_backup', side_effect=ValueError('stop')), \
+                 contextlib.redirect_stdout(output):
+                with self.assertRaises(ValueError):
+                    cloud.backup(argparse.Namespace(remote='test:', include=None), home)
+            self.assertIn('có thể tự chạy', output.getvalue())
+
     def test_upload_failure_does_not_publish_manifest(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp); (home / 'data').write_text('important')
@@ -262,6 +305,30 @@ class CloudTests(unittest.TestCase):
 
 
 class UploadRetryTests(unittest.TestCase):
+    def test_download_retries_transient_errors(self):
+        error = subprocess.CalledProcessError(1, ['rclone'])
+        with mock.patch.object(cloud.subprocess, 'check_output', side_effect=[error, b'data']) as fetch, \
+             mock.patch.object(cloud.time, 'sleep') as sleep:
+            self.assertEqual(cloud.download('test:part'), b'data')
+        self.assertEqual(fetch.call_count, 2)
+        sleep.assert_called_once_with(30)
+
+    def test_missing_rclone_fails_without_wait(self):
+        with mock.patch.object(cloud.subprocess, 'check_output', side_effect=FileNotFoundError('rclone')), \
+             mock.patch.object(cloud.time, 'sleep') as sleep:
+            with self.assertRaises(FileNotFoundError):
+                cloud.download('test:part')
+        sleep.assert_not_called()
+
+    def test_download_exhausts_retries(self):
+        error = subprocess.CalledProcessError(1, ['rclone'])
+        with mock.patch.object(cloud.subprocess, 'check_output', side_effect=error) as fetch, \
+             mock.patch.object(cloud.time, 'sleep') as sleep:
+            with self.assertRaises(subprocess.CalledProcessError):
+                cloud.download('test:part')
+        self.assertEqual(fetch.call_count, 4)
+        self.assertEqual([call.args[0] for call in sleep.call_args_list], [30, 120, 300])
+
     def test_retry_after_failed_transfer(self):
         error = subprocess.CalledProcessError(1, ['rclone'])
         with mock.patch.object(cloud.subprocess, 'run', side_effect=[error, None]) as run, \
@@ -276,7 +343,7 @@ class UploadRetryTests(unittest.TestCase):
              mock.patch.object(cloud.time, 'sleep'):
             with self.assertRaises(ValueError):
                 cloud.upload_verified('test:part', b'data')
-        self.assertEqual(run.call_count, 3)
+        self.assertEqual(run.call_count, 4)
 
 
 if __name__ == '__main__':
