@@ -62,7 +62,7 @@ Setup chuẩn bị Oh My Zsh, theme và plugin; đăng xuất/đăng nhập lạ
 chsh -s /bin/zsh
 ```
 
-Profile Fcitx5 trong repo đã có Keyboard US và Bamboo. Mở `fcitx5-configtool`, kiểm tra chúng xuất hiện và thử nhập tiếng Việt; không thêm bản trùng. Kiểm tra phím chuyển bộ gõ trong Global Options, không giả định luôn là Super+Space.
+Profile Fcitx5 trong repo đã có Keyboard US và Bamboo. Mở `fcitx5-configtool`, kiểm tra chúng xuất hiện và thử nhập tiếng Việt; không thêm bản trùng. Kiểm tra phím chuyển bộ gõ trong Global Options, không giả định luôn là Super+Space. Sau khi thay đổi trong giao diện và dùng thử bộ gõ, kiểm tra `ls -l ~/.config/fcitx5/profile`: Fcitx5 có thể thay file và làm mất symlink Stow. Nếu profile là file thường, các thay đổi sau đó không tự về repo; so sánh với `fcitx5/.config/fcitx5/profile`, giữ bản cần thiết và kiểm tra trước khi đồng bộ lại. Setup có thể chuyển file trùng vào `~/.dotfiles-backup.*` ở lần chạy sau; không xóa bản đó trước khi đối chiếu.
 
 ## 5. Nhóm người dùng và dịch vụ
 

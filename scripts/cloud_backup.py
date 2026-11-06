@@ -57,13 +57,15 @@ def remote_info(remote):
 RETRY_DELAYS = (30, 120, 300)
 
 
-def retry_transfer(operation, label):
+def retry_transfer(operation, label, terminal_exit_codes=frozenset()):
     for attempt in range(len(RETRY_DELAYS) + 1):
         try:
             return operation()
         except (FileNotFoundError, PermissionError):
             raise
         except (subprocess.CalledProcessError, OSError) as exc:
+            if isinstance(exc, subprocess.CalledProcessError) and exc.returncode in terminal_exit_codes:
+                raise
             if attempt == len(RETRY_DELAYS):
                 raise
             delay = RETRY_DELAYS[attempt]
@@ -77,7 +79,7 @@ def download(remote):
     # failures only; validation failures must not be mistaken for success.
     data = retry_transfer(
         lambda: subprocess.check_output(['rclone', '--crypt-no-data-encryption=false', 'cat', remote, '--count', str(CHUNK + 1)]),
-        f'Tải {remote}')
+        f'Tải {remote}', terminal_exit_codes={3, 4} if remote.endswith('/manifest.json') else frozenset())
     if len(data) > CHUNK:
         raise ValueError(f'Đối tượng cloud vượt giới hạn {CHUNK} byte: {remote}')
     return data

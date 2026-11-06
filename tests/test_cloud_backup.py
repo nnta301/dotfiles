@@ -320,6 +320,24 @@ class UploadRetryTests(unittest.TestCase):
                 cloud.download('test:part')
         sleep.assert_not_called()
 
+    def test_missing_manifest_fails_without_backoff(self):
+        for code in (3, 4):
+            with self.subTest(code=code), \
+                 mock.patch.object(cloud.subprocess, 'check_output', side_effect=subprocess.CalledProcessError(code, ['rclone'])) as fetch, \
+                 mock.patch.object(cloud.time, 'sleep') as sleep:
+                with self.assertRaises(subprocess.CalledProcessError):
+                    cloud.download('test:backup/manifest.json')
+                self.assertEqual(fetch.call_count, 1)
+                sleep.assert_not_called()
+
+    def test_missing_chunk_still_retries_for_eventual_visibility(self):
+        error = subprocess.CalledProcessError(3, ['rclone'])
+        with mock.patch.object(cloud.subprocess, 'check_output', side_effect=[error, b'data']) as fetch, \
+             mock.patch.object(cloud.time, 'sleep') as sleep:
+            self.assertEqual(cloud.download('test:backup/home.tar.part000000'), b'data')
+        self.assertEqual(fetch.call_count, 2)
+        sleep.assert_called_once_with(30)
+
     def test_download_exhausts_retries(self):
         error = subprocess.CalledProcessError(1, ['rclone'])
         with mock.patch.object(cloud.subprocess, 'check_output', side_effect=error) as fetch, \

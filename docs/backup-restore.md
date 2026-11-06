@@ -89,7 +89,7 @@ rclone lsf archbackup: --dirs-only
 
 Đổi ID ví dụ. Dry-run đọc/giải mã và kiểm tra **tất cả archive**, liệt kê dữ liệu home sẽ khôi phục, không ghi vào home. Việc này tải dữ liệu qua mạng nên có thể lâu. Lỗi tải tạm thời được thử lại theo các khoảng chờ trên; checksum sai vẫn làm lệnh dừng. Mỗi lần dry-run và apply đều kiểm tra lại toàn bộ archive; việc quét tar và restore có thể tải lại nhiều chunk, kể cả khi chỉ chọn `--include .ssh`. Dự trù băng thông và thời gian, không bỏ qua verify. Tên trên giao diện web OneDrive đã mã hóa; dùng rclone qua `archbackup:` để xem tên thật.
 
-Nếu không có manifest hoặc checksum lỗi, chưa có bản hoàn tất để cài lại. Script không tự xóa bản dở dang, không resume lần chạy cũ; chạy lại tạo ID khác và cần quota cho cả hai. Chỉ xóa đúng bản dở dang sau khi nhận diện chắc chắn, không xóa cả thư mục ArchBackups.
+Nếu rclone báo mã 3 hoặc 4 khi tìm `manifest.json`, script dừng ngay; kiểm tra đúng remote và ID. Các lỗi mạng khác vẫn được thử lại, và file chunk vừa upload vẫn được retry nếu tạm thời chưa xuất hiện. Nếu không có manifest hoặc checksum lỗi, chưa có bản hoàn tất để cài lại. Script không tự xóa bản dở dang, không resume lần chạy cũ; chạy lại tạo ID khác và cần quota cho cả hai. Chỉ xóa đúng bản dở dang sau khi nhận diện chắc chắn, không xóa cả thư mục ArchBackups.
 
 Chạy thử truy cập backup từ Windows/máy khác bằng remote được cấu hình lại với cùng mật khẩu/salt trước khi format. Kiểm tra tài khoản/2FA và BitLocker recovery key mở được ngoài Arch. Một bản cloud vẫn có thể mất do mất tài khoản hoặc thao tác xóa; giữ thêm bản dữ liệu không thể mất nếu có điều kiện.
 
