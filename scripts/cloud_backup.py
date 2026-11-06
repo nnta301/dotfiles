@@ -74,12 +74,12 @@ def retry_transfer(operation, label, terminal_exit_codes=frozenset()):
             time.sleep(delay)
 
 
-def download(remote):
+def download(remote, *, terminal_exit_codes=frozenset()):
     # Bound output even if the remote object is corrupt. Retry command/network
     # failures only; validation failures must not be mistaken for success.
     data = retry_transfer(
         lambda: subprocess.check_output(['rclone', '--crypt-no-data-encryption=false', 'cat', remote, '--count', str(CHUNK + 1)]),
-        f'Tải {remote}', terminal_exit_codes={3, 4} if remote.endswith('/manifest.json') else frozenset())
+        f'Tải {remote}', terminal_exit_codes=terminal_exit_codes)
     if len(data) > CHUNK:
         raise ValueError(f'Đối tượng cloud vượt giới hạn {CHUNK} byte: {remote}')
     return data
@@ -368,7 +368,13 @@ def backup(args, home):
 def restore(args, home):
     remote_info(args.source)
     remote = args.source.rstrip('/')
-    manifest = json.loads(download(remote + '/manifest.json'))
+    try:
+        manifest_data = download(remote + '/manifest.json', terminal_exit_codes={3, 4})
+    except subprocess.CalledProcessError as exc:
+        if exc.returncode in (3, 4):
+            raise ValueError('Không tìm thấy manifest; kiểm tra remote/ID hoặc bản backup có thể chưa hoàn tất.') from exc
+        raise
+    manifest = json.loads(manifest_data)
     if manifest.get('version') != 2:
         raise ValueError('Manifest cloud không hợp lệ.')
     archives = manifest['archives']

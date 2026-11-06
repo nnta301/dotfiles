@@ -20,7 +20,7 @@ class CloudTests(unittest.TestCase):
     def setUp(self):
         self.remote = {}
         self.upload = mock.patch.object(cloud, 'upload_verified', side_effect=lambda path, data: self.remote.__setitem__(path, data))
-        self.download = mock.patch.object(cloud, 'download', side_effect=lambda path: self.remote[path])
+        self.download = mock.patch.object(cloud, 'download', side_effect=lambda path, **kwargs: self.remote[path])
         self.upload.start(); self.download.start()
         self.addCleanup(self.upload.stop); self.addCleanup(self.download.stop)
 
@@ -78,8 +78,8 @@ class CloudTests(unittest.TestCase):
             destination.write_bytes(b'old data')
             original = cloud.download
             reads = {}
-            def changed_after_verify(path):
-                data = original(path)
+            def changed_after_verify(path, **kwargs):
+                data = original(path, **kwargs)
                 if '/home.tar.part' in path:
                     reads[path] = reads.get(path, 0) + 1
                     if reads[path] > 1:
@@ -187,10 +187,10 @@ class CloudTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, mock.patch.object(cloud, 'remote_info'):
             destination = Path(tmp) / 'export'
             original = cloud.download
-            def fail_chunk(path):
+            def fail_chunk(path, **kwargs):
                 if path.endswith('efi.tar.part000000'):
                     raise OSError('network failure')
-                return original(path)
+                return original(path, **kwargs)
             with mock.patch.object(cloud, 'download', side_effect=fail_chunk):
                 with self.assertRaises(OSError):
                     cloud.restore(argparse.Namespace(source='test:backup', export_system=str(destination)), Path(tmp))
@@ -326,9 +326,30 @@ class UploadRetryTests(unittest.TestCase):
                  mock.patch.object(cloud.subprocess, 'check_output', side_effect=subprocess.CalledProcessError(code, ['rclone'])) as fetch, \
                  mock.patch.object(cloud.time, 'sleep') as sleep:
                 with self.assertRaises(subprocess.CalledProcessError):
-                    cloud.download('test:backup/manifest.json')
+                    cloud.download('test:backup/manifest.json', terminal_exit_codes={3, 4})
                 self.assertEqual(fetch.call_count, 1)
                 sleep.assert_not_called()
+
+    def test_uploaded_manifest_retries_transient_missing_readback(self):
+        error = subprocess.CalledProcessError(3, ['rclone'])
+        with mock.patch.object(cloud.subprocess, 'run') as upload, \
+             mock.patch.object(cloud.subprocess, 'check_output', side_effect=[error, b'data']) as fetch, \
+             mock.patch.object(cloud.time, 'sleep') as sleep:
+            cloud.upload_verified('test:backup/manifest.json', b'data')
+        self.assertEqual(upload.call_count, 1)
+        self.assertEqual(fetch.call_count, 2)
+        sleep.assert_called_once_with(30)
+
+    def test_restore_missing_manifest_has_actionable_error(self):
+        for code in (3, 4):
+            with self.subTest(code=code), tempfile.TemporaryDirectory() as tmp, \
+                 mock.patch.object(cloud, 'remote_info'), \
+                 mock.patch.object(cloud.subprocess, 'check_output', side_effect=subprocess.CalledProcessError(code, ['rclone'])), \
+                 mock.patch.object(cloud.time, 'sleep') as sleep:
+                with self.assertRaisesRegex(ValueError, 'kiểm tra remote/ID'):
+                    cloud.restore(argparse.Namespace(source='test:wrong', export_system=None), Path(tmp))
+                sleep.assert_not_called()
+                self.assertEqual(list(Path(tmp).iterdir()), [])
 
     def test_missing_chunk_still_retries_for_eventual_visibility(self):
         error = subprocess.CalledProcessError(3, ['rclone'])
