@@ -119,7 +119,7 @@ nvim --headless "+Lazy! sync" +qa
 
 ```
 dotfiles/
-├── hypr/           → UserConfigs/ override chồng lên JaKooLit upstream
+├── hypr/           → UserConfigs/ và UserScripts cá nhân chồng lên JaKooLit upstream
 ├── zsh/            → .zshrc (Oh-My-Zsh + aliases)
 ├── nvim/           → .config/nvim/ (LazyVim)
 ├── scripts/        → cleanup.sh, backup.sh, restore.sh, cloud_backup.py và transfer.py

@@ -26,7 +26,7 @@ Repo này **không** theo dõi toàn bộ cấu hình Hyprland. Thay vào đó, 
 │  └─ Cấu hình Hyprland lõi, Waybar, theme, scripts, animation   │
 ├─────────────────────────────────────────────────────────────────┤
 │  Lớp 2: Repo Này — Cấu Hình Ghi Đè Cá Nhân                     │
-│  ├─ hypr/   → UserConfigs/ cá nhân                            │
+│  ├─ hypr/   → UserConfigs/ + UserScripts cá nhân              │
 │  ├─ zsh/    → .zshrc với Oh-My-Zsh + tất cả alias cá nhân      │
 │  ├─ nvim/   → Cấu hình LazyVim đầy đủ (độc lập với WM)         │
 │  └─ fcitx5/ → Profile bộ gõ tiếng Việt                         │
@@ -113,7 +113,8 @@ dotfiles/
 │
 ├── 📂 hypr/                       ← Cấu hình Hyprland cá nhân
 │   └── .config/hypr/              ← UserConfigs
-│       └── UserConfigs/           ← Thay thế các mặc định của upstream
+│       ├── UserConfigs/           ← Thay thế các mặc định của upstream
+│       └── UserScripts/           ← Script cá nhân (Parsec passthrough)
 │           ├── LaptopDisplay.conf     ← eDP-1 scale 1 (sửa lỗi phần cứng)
 │           ├── Startup_Apps.conf      ← exec-once = fcitx5 -d
 │           ├── ENVariables.conf       ← Biến môi trường Fcitx5 (Qt + X11)
@@ -139,10 +140,10 @@ dotfiles/
 │
 ├── 📂 fcitx5/                     ← Profile bộ gõ tiếng Việt
 └── 📂 scripts/                    ← Script tiện ích
-    ├── cleanup.sh                 ← Dọn cache Pacman + orphan + journal
+    ├── cleanup.sh                 ← Dọn cache hệ thống và ứng dụng, có hỏi trước khi xóa
     ├── backup.sh                  ← Backup mã hóa lên OneDrive
     ├── restore.sh                 ← Kiểm tra và phục hồi dữ liệu home
-    ├── cloud_backup.py            ← Upload/đọc cloud theo từng phần
+    ├── cloud_backup.py            ← Upload/đọc cloud theo từng phần, dọn bản dở dang (prune)
     └── transfer.py                ← Kiểm tra và restore backup local cũ
 ```
 
