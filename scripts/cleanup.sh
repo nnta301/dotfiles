@@ -172,7 +172,12 @@ clear_cache 'cache pip' pip "$cache_home/pip"
 
 echo
 echo '7. Dữ liệu phải tải lại hoặc gỡ khỏi hệ thống'
-clear_cache 'thư viện Maven (build sau phải tải lại)' mvn "$HOME/.m2/repository"
+# The Maven process is `java`, so match its launcher class instead of the name.
+if pgrep -f org.codehaus.plexus.classworlds >/dev/null 2>&1; then
+    echo 'Maven đang chạy; bỏ qua thư viện Maven.'
+else
+    clear_cache 'thư viện Maven (build sau phải tải lại)' '' "$HOME/.m2/repository"
+fi
 if command -v paccache >/dev/null; then
     if $dry_run; then
         run paccache -d -u -k 0 || true

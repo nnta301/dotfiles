@@ -61,6 +61,11 @@ class CleanupTests(unittest.TestCase):
         self.run_cleanup()
         self.assertEqual(self.exists(), ['.cache/google-chrome/data'])
 
+    def test_running_maven_build_keeps_repository(self):
+        self.stub('pgrep', '[ "$1" = -f ]')
+        self.run_cleanup()
+        self.assertEqual(self.exists(), ['.m2/repository/lib.jar'])
+
     def test_symlinked_cache_is_not_followed(self):
         outside = self.home.parent / 'outside'
         outside.mkdir()
