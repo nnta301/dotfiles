@@ -2,7 +2,7 @@
 """Chunked encrypted OneDrive backup via a dedicated rclone crypt remote."""
 import argparse
 import configparser
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import io
 import json
@@ -21,6 +21,19 @@ import uuid
 import transfer
 
 CHUNK = 64 * 1024 * 1024
+# Application state rewritten while the desktop is in use. These files are
+# snapshotted and may be inconsistent; everything else must stay stable.
+VOLATILE_PATHS = (
+    '.bash_history',
+    '.config/Code',
+    '.config/chromium',
+    '.config/discord',
+    '.config/google-chrome',
+    '.local/share/gvfs-metadata',
+    '.mozilla',
+    '.zsh_history',
+)
+BACKUP_DIR = re.compile(r'arch-(\d{8}T\d{6}Z)-[0-9a-f]{8}')
 
 
 def remote_info(remote):
@@ -264,12 +277,21 @@ def sync_directory(home, override=None):
     return home / 'OneDrive'
 
 
+def child_remote(remote, name):
+    base = remote.rstrip('/')
+    return base + ('' if base.endswith(':') else '/') + name
+
+
 def home_entries(home, selected, exclusions, skipped):
     def visit(path, name):
         if any(transfer.inside(path, excluded) for excluded in exclusions):
             skipped.append(name)
             return
-        info = path.lstat()
+        try:
+            info = path.lstat()
+        except (FileNotFoundError, NotADirectoryError):
+            skipped.append(name)
+            return
         if not (stat.S_ISREG(info.st_mode) or stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode)):
             skipped.append(name)
             return
@@ -278,20 +300,55 @@ def home_entries(home, selected, exclusions, skipped):
             return
         yield path, name, info
         if stat.S_ISDIR(info.st_mode):
-            for child in sorted(path.iterdir()):
+            try:
+                children = sorted(path.iterdir())
+            except (FileNotFoundError, NotADirectoryError):
+                return
+            for child in children:
                 yield from visit(child, name + '/' + child.name)
     for name in selected:
         yield from visit(home / name, name)
+
+
+def is_volatile(name, volatile):
+    return any(name == root or name.startswith(root + '/') for root in volatile)
+
+
+def add_home_entry(tar, path, name, before, scratch, volatile):
+    """Add one entry; return False if it vanished before tar wrote its header."""
+    try:
+        if volatile and stat.S_ISREG(before.st_mode):
+            # A stream header cannot be corrected later, so fix the size locally.
+            with path.open('rb') as source, tempfile.TemporaryFile(dir=scratch) as snapshot:
+                shutil.copyfileobj(source, snapshot)
+                info = tar.gettarinfo(arcname=name, fileobj=source)
+                info.size = snapshot.tell()
+                snapshot.seek(0)
+                tar.addfile(info, snapshot)
+        else:
+            tar.add(path, arcname=name, recursive=False)
+    except (FileNotFoundError, NotADirectoryError):
+        return False
+    return True
+
+
+def file_changed(path, before):
+    try:
+        after = path.lstat()
+    except (FileNotFoundError, NotADirectoryError):
+        return False  # Its complete contents are already in the archive.
+    return (before.st_ino, before.st_size, before.st_mtime_ns) != (after.st_ino, after.st_size, after.st_mtime_ns)
 
 
 def backup(args, home):
     drive, cloud_folder = remote_info(args.remote)
     if not cloud_folder:
         raise ValueError('Crypt phải trỏ tới thư mục riêng như onedrive:ArchBackups, không phải gốc drive.')
-    remote = args.remote.rstrip('/') + ('' if args.remote.endswith(':') else '/') + 'arch-' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ-') + uuid.uuid4().hex[:8]
+    remote = child_remote(args.remote, 'arch-' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ-') + uuid.uuid4().hex[:8])
     transfer.relative(cloud_folder)
     sync_dir = sync_directory(home, getattr(args, 'onedrive_dir', None))
     exclusions = [home / '.cache', sync_dir / cloud_folder]
+    volatile_paths = transfer.roots([*VOLATILE_PATHS, *(getattr(args, 'volatile', None) or [])])
     names = transfer.roots(args.include or transfer.default_paths(home))
     for name in names:
         transfer.check_parents(home, name)
@@ -319,7 +376,7 @@ def backup(args, home):
     print(f'Home ước tính {estimate / 1024**3:.1f} GiB; OneDrive trống {quota["free"] / 1024**3:.1f} GiB.')
     print('Đích mã hóa:', remote, flush=True)
     print('Phải giữ mật khẩu crypt + salt và thông tin remote ngoài máy trước khi format.', flush=True)
-    archives, skipped, links = {}, [], []
+    archives, skipped, links, changed = {}, [], [], []
     paused = False
     # Force scratch into excluded .cache rather than user TMPDIR or OneDrive.
     cache = home / '.cache' / 'dotfiles-backup'
@@ -337,26 +394,33 @@ def backup(args, home):
             writer = ChunkWriter(remote, 'home.tar')
             with tarfile.open(fileobj=writer, mode='w|', dereference=False) as tar:
                 for path, name, before in home_entries(home, selected, exclusions, skipped):
+                    volatile = is_volatile(name, volatile_paths)
+                    if not add_home_entry(tar, path, name, before, out, volatile):
+                        skipped.append(name)
+                        continue
+                    tar.inodes.clear()
                     if stat.S_ISLNK(before.st_mode):
                         links.append(name)
-                    tar.add(path, arcname=name, recursive=False)
-                    tar.inodes.clear()
-                    after = path.lstat()
-                    if (before.st_ino, before.st_size, before.st_mtime_ns) != (after.st_ino, after.st_size, after.st_mtime_ns):
-                        raise ValueError(f'File thay đổi trong lúc đọc: {name}')
+                    if stat.S_ISREG(before.st_mode) and file_changed(path, before):
+                        if not volatile:
+                            raise ValueError(f'File thay đổi trong lúc đọc: {name}')
+                        changed.append(name)
             archives['home.tar'] = writer.finish()
             warnings.append('Cache, filesystem con, symlink đích và bản cloud cũ không được sao lưu; xem skipped/symlinks.')
+            if changed:
+                warnings.append(f'{len(changed)} file ứng dụng thay đổi lúc đọc, bản lưu có thể không nhất quán; xem changed trong manifest.')
             (out / 'REPORT.txt').write_text('\n'.join(warnings) + '\n')
             # Pack reports and bundle in a small separate archive for rescue from live USB.
             archives['metadata.tar'] = stream_system_archive(out, False, remote, 'metadata.tar')
             manifest = {'version': 2, 'created': datetime.now(timezone.utc).isoformat(),
-                        'archives': archives, 'paths': selected, 'skipped': skipped, 'symlinks': links,
+                        'archives': archives, 'paths': selected, 'skipped': skipped, 'symlinks': links, 'changed': changed,
                         'warnings': warnings}
             upload_verified(remote + '/manifest.json', (json.dumps(manifest, ensure_ascii=True, indent=2) + '\n').encode())
             print('BACKUP CLOUD ĐÃ UPLOAD VÀ ĐỌC LẠI ĐẦY ĐỦ:', remote)
             print('\n'.join(warnings))
     except BaseException:
         print('Backup cloud chưa hoàn tất; không dùng bản này để format:', remote, file=sys.stderr)
+        print('Dọn bản dở dang: python3 scripts/cloud_backup.py prune (xem trước, thêm --apply để xóa).', file=sys.stderr)
         raise
     finally:
         if paused:
@@ -419,6 +483,40 @@ def restore(args, home):
         transfer.restore_tar(args, home, tar)
 
 
+def prune(args):
+    """List, and with --apply delete, old backup folders without a manifest."""
+    if args.min_age_hours < 0:
+        raise ValueError('--min-age-hours không được âm.')
+    remote_info(args.remote)
+    def listing(target, kind):
+        return subprocess.check_output(['rclone', 'lsf', target, kind], text=True).splitlines()
+    # The manifest is uploaded last, so a running backup also lacks one.
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=args.min_age_hours)
+    incomplete = []
+    for entry in listing(args.remote, '--dirs-only'):
+        name = entry.rstrip('/')
+        match = BACKUP_DIR.fullmatch(name)
+        if not match:
+            continue
+        created = datetime.strptime(match[1], '%Y%m%dT%H%M%SZ').replace(tzinfo=timezone.utc)
+        target = child_remote(args.remote, name)
+        if 'manifest.json' in listing(target, '--files-only'):
+            continue
+        if created > cutoff:
+            print('Giữ lại vì còn mới, có thể đang chạy:', target)
+            continue
+        incomplete.append(target)
+        print('Bản dở dang:', target)
+    if not incomplete:
+        print('Không có bản dở dang đủ cũ để xóa.')
+    elif not args.apply:
+        print(f'Xem trước: {len(incomplete)} bản; thêm --apply để xóa.')
+    else:
+        for target in incomplete:
+            subprocess.run(['rclone', 'purge', target], check=True)
+            print('Đã xóa:', target, flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='command', required=True)
@@ -426,6 +524,11 @@ def main():
     b.add_argument('--remote', default='archbackup:', help='Remote crypt trên OneDrive (mặc định archbackup:)')
     b.add_argument('--include', action='append', help='Thay phạm vi home bằng các đường dẫn tương đối đã chọn')
     b.add_argument('--onedrive-dir', help='Thư mục sync local nếu dùng cấu hình client riêng; dùng để bỏ bản cloud cũ')
+    b.add_argument('--volatile', action='append', help='Thêm đường dẫn tương đối được phép thay đổi khi backup (lưu bản chụp)')
+    p = sub.add_parser('prune', help='Xóa các thư mục backup cũ chưa có manifest')
+    p.add_argument('--remote', default='archbackup:', help='Remote crypt trên OneDrive (mặc định archbackup:)')
+    p.add_argument('--min-age-hours', type=int, default=24, help='Chỉ xóa bản cũ hơn số giờ này (mặc định 24)')
+    p.add_argument('--apply', action='store_true', help='Thực sự xóa; mặc định chỉ xem trước')
     r = sub.add_parser('restore')
     r.add_argument('source', help='archbackup:arch-<id> hoặc thư mục backup local phiên bản cũ')
     r.add_argument('--include', action='append')
@@ -439,6 +542,8 @@ def main():
     try:
         if args.command == 'backup':
             backup(args, Path.home().resolve())
+        elif args.command == 'prune':
+            prune(args)
         elif ':' not in args.source:
             if args.export_system:
                 raise ValueError('--export-system dành cho backup cloud.')

@@ -274,6 +274,116 @@ class CloudTests(unittest.TestCase):
                     cloud.backup(argparse.Namespace(remote='test:', include=None), home)
             self.assertFalse(any(name.endswith('/manifest.json') for name in self.remote))
 
+    def run_backup(self, home, entries_hook=None):
+        def prepare(out, repo, archive_func):
+            for name in ['repo.tar', 'etc.tar', 'efi.tar']:
+                archive_func(home / 'stable', out / name)
+            return []
+        original = cloud.home_entries
+        def walk(*args):
+            for entry in original(*args):
+                if entries_hook:
+                    entries_hook(entry[1])
+                yield entry
+        with mock.patch.object(cloud, 'remote_info', return_value=('drive:', 'ArchBackups')), \
+             mock.patch.object(cloud.subprocess, 'check_output', return_value=json.dumps({'free': 10 * 1024**3})), \
+             mock.patch.object(cloud.transfer, 'pause_onedrive', return_value=False), \
+             mock.patch.object(cloud.transfer, 'prepare_system_backup', side_effect=prepare), \
+             mock.patch.object(cloud, 'home_entries', side_effect=walk):
+            cloud.backup(argparse.Namespace(remote='test:', include=None), home)
+        path = next(name for name in self.remote if name.endswith('/manifest.json'))
+        return path.rsplit('/', 1)[0], json.loads(self.remote[path])
+
+    def changing_read(self, target, content):
+        # Rewrite target right after the backup has read it.
+        original = cloud.file_changed
+        def changed(path, before):
+            if path == target:
+                path.write_bytes(content)
+            return original(path, before)
+        return mock.patch.object(cloud, 'file_changed', side_effect=changed)
+
+    def test_volatile_change_is_archived_and_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp); (home / 'stable').mkdir()
+            state = home / '.config/google-chrome/Default/Cookies'
+            state.parent.mkdir(parents=True); state.write_bytes(b'cookie data')
+            with self.changing_read(state, b'rewritten and longer'):
+                remote, manifest = self.run_backup(home)
+            self.assertEqual(manifest['changed'], ['.config/google-chrome/Default/Cookies'])
+            reader = cloud.ChunkReader(remote, manifest['archives']['home.tar'])
+            reader.verify()
+            with tarfile.open(fileobj=reader, mode='r:') as tar:
+                self.assertEqual(tar.extractfile('.config/google-chrome/Default/Cookies').read(), b'cookie data')
+
+    def test_stable_file_change_still_stops_backup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp); (home / 'stable').mkdir()
+            document = home / 'stable/document'; document.write_bytes(b'original')
+            with self.changing_read(document, b'rewritten and longer'):
+                with self.assertRaisesRegex(ValueError, 'thay đổi'):
+                    self.run_backup(home)
+            self.assertFalse(any(name.endswith('/manifest.json') for name in self.remote))
+
+    def test_file_vanishing_mid_walk_is_recorded(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp); (home / 'stable').mkdir()
+            (home / 'stable/a').write_bytes(b'keep'); gone = home / 'stable/b'; gone.write_bytes(b'temporary')
+            def remove(name):
+                if name == 'stable/a':
+                    gone.unlink(missing_ok=True)
+            calls = {'count': 0}
+            def on_entry(name):
+                # The first walk only estimates size; delete during the real one.
+                if name == 'stable':
+                    calls['count'] += 1
+                if calls['count'] == 2:
+                    remove(name)
+            remote, manifest = self.run_backup(home, on_entry)
+            self.assertIn('stable/b', manifest['skipped'])
+            reader = cloud.ChunkReader(remote, manifest['archives']['home.tar'])
+            with tarfile.open(fileobj=reader, mode='r:') as tar:
+                self.assertEqual(tar.extractfile('stable/a').read(), b'keep')
+
+    def test_file_vanishing_before_header_leaves_valid_archive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp); path = home / 'file'; path.write_bytes(b'x')
+            before = path.lstat(); path.unlink()
+            for volatile in (False, True):
+                output = io.BytesIO()
+                with self.subTest(volatile=volatile), tarfile.open(fileobj=output, mode='w|') as tar:
+                    self.assertFalse(cloud.add_home_entry(tar, path, 'file', before, home, volatile))
+                self.assertEqual(tarfile.open(fileobj=io.BytesIO(output.getvalue())).getnames(), [])
+
+    def test_prune_removes_only_old_folders_without_manifest(self):
+        if not shutil.which('rclone'):
+            self.skipTest('rclone missing')
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp); encrypted = directory / 'encrypted'; encrypted.mkdir()
+            recent = cloud.datetime.now(cloud.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+            names = {'complete': 'arch-20200101T000000Z-aaaaaaaa', 'old': 'arch-20200101T000000Z-bbbbbbbb',
+                     'running': f'arch-{recent}-cccccccc', 'other': 'photos'}
+            with mock.patch.dict(os.environ, {'RCLONE_CONFIG': str(directory / 'rclone.conf')}), \
+                 mock.patch.object(cloud, 'remote_info'):
+                subprocess.run(['rclone', 'config', 'create', 'localtest', 'crypt',
+                                'remote', str(encrypted), 'password', 'test-only-password', '--obscure'],
+                               check=True, capture_output=True)
+                def put(path):
+                    subprocess.run(['rclone', 'rcat', 'localtest:' + path], input=b'x', check=True)
+                for name in names.values():
+                    put(name + '/home.tar.part000000')
+                put(names['complete'] + '/manifest.json')
+                def existing():
+                    output = subprocess.check_output(['rclone', 'lsf', 'localtest:', '--dirs-only'], text=True)
+                    return {line.rstrip('/') for line in output.splitlines()}
+                args = argparse.Namespace(remote='localtest:', min_age_hours=24, apply=False)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    cloud.prune(args)
+                    self.assertEqual(existing(), set(names.values()))
+                    args.apply = True
+                    cloud.prune(args)
+                self.assertEqual(existing(), set(names.values()) - {names['old']})
+
     def test_real_rclone_crypt_local_roundtrip(self):
         if not shutil.which('rclone'):
             self.skipTest('rclone missing')
