@@ -212,6 +212,7 @@ aur/gtk-engine-murrine
 aur/hyde-cli-git
 aur/legacy-launcher
 aur/onedrive-abraunegg
+aur/parsec-bin
 aur/pokemon-colorscripts-git
 aur/postman-bin
 aur/powertop-git
