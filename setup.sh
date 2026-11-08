@@ -28,7 +28,7 @@ header()  { echo -e "\n${CYAN}${BOLD}━━━ $1 ━━━${NC}"; }
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Stow packages managed by this repo (personal override layer only)
-# NOTE: 'hypr' only contains UserConfigs/ — JaKooLit manages the core config.
+# NOTE: 'hypr' only contains UserConfigs/ and personal UserScripts — JaKooLit manages the core config.
 STOW_PACKAGES=(zsh nvim hypr fcitx5)
 
 # This personal repo targets the current RTX 2060 + stock linux kernel.
