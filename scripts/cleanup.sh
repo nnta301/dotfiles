@@ -8,7 +8,7 @@ case "${1:-}" in
     --dry-run|-n) dry_run=true ;;
     --help|-h)
         echo 'Cách dùng: ./scripts/cleanup.sh [--dry-run]'
-        echo 'Giữ 2 phiên bản package trong cache; hỏi trước khi xóa orphan, cache yay và thùng rác.'
+        echo 'Giữ 2 phiên bản package trong cache; hỏi trước khi xóa orphan, journal cũ, cache ứng dụng, thùng rác và dữ liệu phải tải lại.'
         exit 0 ;;
     *) echo "Tham số không hợp lệ: $1" >&2; exit 2 ;;
 esac
@@ -28,6 +28,29 @@ run() {
 }
 show_size() {
     if [[ -e $1 ]]; then du -sh -- "$1" 2>/dev/null || true; fi
+}
+# clear_cache LABEL PROCESS DIR...: empty the directories, keeping them in place.
+# Skipped while PROCESS is running, because the app may still be writing there.
+clear_cache() {
+    local label=$1 process=$2 dir
+    shift 2
+    local -a dirs=()
+    for dir in "$@"; do
+        if [[ -d $dir && ! -L $dir ]] && [[ -n $(find "$dir" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null) ]]; then
+            dirs+=("$dir")
+        fi
+    done
+    (( ${#dirs[@]} )) || return 0
+    du -sch -- "${dirs[@]}" 2>/dev/null | tail -n 1 | sed "s|total|$label|" || true
+    if [[ -n $process ]] && pgrep -x "$process" >/dev/null 2>&1; then
+        echo "$process đang chạy; bỏ qua. Tắt ứng dụng rồi chạy lại."
+    elif $dry_run; then
+        echo "Xem trước: sẽ hỏi trước khi xóa $label."
+    elif ask "Xóa $label?"; then
+        for dir in "${dirs[@]}"; do
+            run find "$dir" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} + || true
+        done
+    fi
 }
 
 if ! command -v pacman >/dev/null; then
@@ -97,9 +120,12 @@ echo '4. Journal hệ thống (giới hạn journal đã lưu trữ ở 100 MB)'
 if command -v journalctl >/dev/null; then
     if $dry_run; then
         journalctl --disk-usage || failed=1
-        echo 'Xem trước: sudo journalctl --vacuum-size=100M'
+        echo 'Xem trước: sẽ hỏi trước khi chạy sudo journalctl --vacuum-size=100M'
     else
-        run sudo journalctl --vacuum-size=100M || true
+        journalctl --disk-usage || failed=1
+        if ask 'Xóa journal cũ? Log dùng để chẩn đoán lỗi driver/boot có thể mất.'; then
+            run sudo journalctl --vacuum-size=100M || true
+        fi
     fi
 else
     echo 'Bỏ qua: không tìm thấy journalctl.'
@@ -129,6 +155,36 @@ if [[ -d $trash_dir && ! -L $trash_dir ]]; then
                 run find "$dir" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} + || true
             fi
         done
+    fi
+fi
+
+echo
+echo '6. Cache ứng dụng (tự tạo lại khi cần)'
+# Service Worker storage, workspaceStorage, extensions and cliphist hold user state.
+cache_home=${XDG_CACHE_HOME:-$HOME/.cache}
+config_home=${XDG_CONFIG_HOME:-$HOME/.config}
+clear_cache 'cache Chrome' chrome "$cache_home/google-chrome"
+clear_cache 'cache VS Code' code "$config_home/Code/CachedExtensionVSIXs" \
+    "$config_home/Code/CachedData" "$config_home/Code/Cache" "$config_home/Code/logs"
+clear_cache 'cache Discord' Discord "$config_home/discord/Cache"
+clear_cache 'cache npm' npm "$HOME/.npm"
+clear_cache 'cache pip' pip "$cache_home/pip"
+
+echo
+echo '7. Dữ liệu phải tải lại hoặc gỡ khỏi hệ thống'
+clear_cache 'thư viện Maven (build sau phải tải lại)' mvn "$HOME/.m2/repository"
+if command -v paccache >/dev/null; then
+    if $dry_run; then
+        run paccache -d -u -k 0 || true
+    elif ask 'Xóa cache của các package đã gỡ? Sẽ không hạ cấp được về các bản đó từ cache.'; then
+        run sudo paccache -r -u -k 0 || true
+    fi
+fi
+if command -v flatpak >/dev/null; then
+    if $dry_run; then
+        echo 'Xem trước: sẽ hỏi trước khi gỡ Flatpak runtime không còn dùng.'
+    elif ask 'Gỡ Flatpak runtime không còn dùng? Flatpak sẽ liệt kê và hỏi lại.'; then
+        run flatpak uninstall --unused || true
     fi
 fi
 
