@@ -28,14 +28,19 @@ fi
 #fastfetch -c $HOME/.config/fastfetch/config-compact.jsonc
 
 # Set-up icons for files/directories in terminal using lsd
-alias ls='lsd'
+# Without lsd, keep plain ls usable in a TTY or a partial install.
+if command -v lsd >/dev/null; then
+    alias ls='lsd'
+    alias lt='ls --tree'
+fi
 alias l='ls -l'
 alias la='ls -a'
 alias lla='ls -la'
-alias lt='ls --tree'
 
 # Set-up FZF key bindings (CTRL R for fuzzy history finder)
-source <(fzf --zsh)
+if command -v fzf >/dev/null; then
+    source <(fzf --zsh)
+fi
 
 HISTFILE=~/.zsh_history
 HISTSIZE=10000
