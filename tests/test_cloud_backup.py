@@ -274,7 +274,7 @@ class CloudTests(unittest.TestCase):
                     cloud.backup(argparse.Namespace(remote='test:', include=None), home)
             self.assertFalse(any(name.endswith('/manifest.json') for name in self.remote))
 
-    def run_backup(self, home, entries_hook=None):
+    def run_backup(self, home, entries_hook=None, **options):
         def prepare(out, repo, archive_func):
             for name in ['repo.tar', 'etc.tar', 'efi.tar']:
                 archive_func(home / 'stable', out / name)
@@ -290,25 +290,28 @@ class CloudTests(unittest.TestCase):
              mock.patch.object(cloud.transfer, 'pause_onedrive', return_value=False), \
              mock.patch.object(cloud.transfer, 'prepare_system_backup', side_effect=prepare), \
              mock.patch.object(cloud, 'home_entries', side_effect=walk):
-            cloud.backup(argparse.Namespace(remote='test:', include=None), home)
+            cloud.backup(argparse.Namespace(remote='test:', include=None, **options), home)
         path = next(name for name in self.remote if name.endswith('/manifest.json'))
         return path.rsplit('/', 1)[0], json.loads(self.remote[path])
 
-    def changing_read(self, target, content):
-        # Rewrite target right after the backup has read it.
-        original = cloud.file_changed
-        def changed(path, before):
-            if path == target:
-                path.write_bytes(content)
-            return original(path, before)
-        return mock.patch.object(cloud, 'file_changed', side_effect=changed)
+    def writes_during_read(self, target, times=None):
+        # Append to target while the backup copies it, optionally only N times.
+        original = shutil.copyfileobj
+        state = {'writes': 0}
+        def copy(source, destination, *args):
+            original(source, destination, *args)
+            if source.name == str(target) and (times is None or state['writes'] < times):
+                state['writes'] += 1
+                with target.open('ab') as output:
+                    output.write(b'+')
+        return mock.patch.object(cloud.shutil, 'copyfileobj', side_effect=copy)
 
     def test_volatile_change_is_archived_and_reported(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp); (home / 'stable').mkdir()
             state = home / '.config/google-chrome/Default/Cookies'
             state.parent.mkdir(parents=True); state.write_bytes(b'cookie data')
-            with self.changing_read(state, b'rewritten and longer'):
+            with self.writes_during_read(state):
                 remote, manifest = self.run_backup(home)
             self.assertEqual(manifest['changed'], ['.config/google-chrome/Default/Cookies'])
             reader = cloud.ChunkReader(remote, manifest['archives']['home.tar'])
@@ -320,10 +323,67 @@ class CloudTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp); (home / 'stable').mkdir()
             document = home / 'stable/document'; document.write_bytes(b'original')
-            with self.changing_read(document, b'rewritten and longer'):
+            with self.writes_during_read(document), mock.patch.object(cloud.time, 'sleep') as sleep:
                 with self.assertRaisesRegex(ValueError, 'thay đổi'):
                     self.run_backup(home)
+            self.assertEqual(sleep.call_count, cloud.STABLE_READ_ATTEMPTS - 1)
             self.assertFalse(any(name.endswith('/manifest.json') for name in self.remote))
+
+    def test_transient_write_is_reread_and_not_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp); (home / 'stable').mkdir()
+            document = home / 'stable/document'; document.write_bytes(b'original')
+            with self.writes_during_read(document, times=1), mock.patch.object(cloud.time, 'sleep'):
+                remote, manifest = self.run_backup(home)
+            self.assertEqual(manifest['changed'], [])
+            reader = cloud.ChunkReader(remote, manifest['archives']['home.tar'])
+            with tarfile.open(fileobj=reader, mode='r:') as tar:
+                self.assertEqual(tar.extractfile('stable/document').read(), b'original+')
+
+    def test_large_file_change_stops_backup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp); (home / 'stable').mkdir()
+            (home / 'stable/image').write_bytes(b'large')
+            with mock.patch.object(cloud, 'STABLE_READ_LIMIT', 0), \
+                 mock.patch.object(cloud, 'file_changed', return_value=True):
+                with self.assertRaisesRegex(ValueError, 'File lớn'):
+                    self.run_backup(home)
+
+    def test_reproducible_and_requested_paths_are_excluded(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp); (home / 'stable').mkdir()
+            for name in ['.m2/settings.xml', '.m2/repository/lib.jar', '.npm/cached', 'OneDrive/file']:
+                (home / name).parent.mkdir(parents=True, exist_ok=True)
+                (home / name).write_bytes(b'x')
+            remote, manifest = self.run_backup(home, exclude=['OneDrive'])
+            reader = cloud.ChunkReader(remote, manifest['archives']['home.tar'])
+            with tarfile.open(fileobj=reader, mode='r:') as tar:
+                names = set(tar.getnames())
+            self.assertIn('.m2/settings.xml', names)
+            self.assertFalse(names & {'.m2/repository', '.npm', 'OneDrive'})
+            self.assertLessEqual({'.m2/repository', '.npm', 'OneDrive'}, set(manifest['skipped']))
+
+    def test_dry_run_downloads_home_only_once(self):
+        self.manifest(self.tarbytes())
+        original = cloud.download
+        counts = {}
+        def counted(path, **kwargs):
+            counts[path] = counts.get(path, 0) + 1
+            return original(path, **kwargs)
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(cloud, 'remote_info'), \
+             mock.patch.object(cloud, 'download', side_effect=counted):
+            cloud.restore(argparse.Namespace(source='test:backup', export_system=None, apply=False, include=None), Path(tmp))
+        parts = {path: count for path, count in counts.items() if '/home.tar.part' in path}
+        self.assertGreater(len(parts), 1)
+        # Opening the archive for extraction re-reads only its first chunk.
+        self.assertEqual(sorted(parts.values())[:-1], [1] * (len(parts) - 1))
+        self.assertEqual(parts['test:backup/home.tar.part000000'], 2)
+
+    def test_scan_rejects_archive_with_wrong_total_checksum(self):
+        description = self.packed('home.tar', self.tarbytes())
+        description['sha256'] = '0' * 64
+        with self.assertRaisesRegex(ValueError, 'Checksum archive'):
+            cloud.ChunkReader('test:backup', description).scan_tar()
 
     def test_file_vanishing_mid_walk_is_recorded(self):
         with tempfile.TemporaryDirectory() as tmp:

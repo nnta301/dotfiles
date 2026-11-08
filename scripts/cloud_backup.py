@@ -33,6 +33,20 @@ VOLATILE_PATHS = (
     '.mozilla',
     '.zsh_history',
 )
+# Downloadable or disposable data under home; never user-authored files.
+REPRODUCIBLE_PATHS = (
+    '.cargo/registry',
+    '.conda/pkgs',
+    '.gradle/caches',
+    '.local/share/Trash',
+    '.m2/repository',
+    '.npm',
+    '.nuget/packages',
+)
+# Small files are re-read until stable; larger ones would need too much scratch.
+STABLE_READ_LIMIT = 256 * 1024 * 1024
+STABLE_READ_ATTEMPTS = 3
+STABLE_READ_DELAY = 1
 BACKUP_DIR = re.compile(r'arch-(\d{8}T\d{6}Z)-[0-9a-f]{8}')
 
 
@@ -224,6 +238,28 @@ class ChunkReader(io.RawIOBase):
             raise ValueError('Checksum archive sai.')
         self.seek(0)
 
+    def scan_tar(self):
+        """Verify the whole archive and list its members in one download pass."""
+        reader, sha = self, hashlib.sha256()
+
+        class HashingReader:
+            def read(self, size):
+                data = reader.read(size)
+                sha.update(data)
+                return data
+
+        hashing = HashingReader()
+        self.seek(0)
+        # Stream mode reads over file data instead of seeking past chunks.
+        with tarfile.open(fileobj=hashing, mode='r|', bufsize=1024 * 1024) as tar:
+            members = tar.getmembers()
+            while hashing.read(1024 * 1024):
+                pass
+        if sha.hexdigest() != self.description['sha256']:
+            raise ValueError('Checksum archive sai.')
+        self.seek(0)
+        return members
+
 
 def stream_system_archive(source, privileged, remote, name):
     prefix = ['sudo'] if privileged else []
@@ -315,21 +351,41 @@ def is_volatile(name, volatile):
 
 
 def add_home_entry(tar, path, name, before, scratch, volatile):
-    """Add one entry; return False if it vanished before tar wrote its header."""
+    """Add one entry: return 'added', 'changed', or None if it vanished first."""
+    regular = stat.S_ISREG(before.st_mode)
     try:
-        if volatile and stat.S_ISREG(before.st_mode):
-            # A stream header cannot be corrected later, so fix the size locally.
-            with path.open('rb') as source, tempfile.TemporaryFile(dir=scratch) as snapshot:
-                shutil.copyfileobj(source, snapshot)
-                info = tar.gettarinfo(arcname=name, fileobj=source)
-                info.size = snapshot.tell()
-                snapshot.seek(0)
-                tar.addfile(info, snapshot)
-        else:
-            tar.add(path, arcname=name, recursive=False)
+        if regular and (volatile or before.st_size <= STABLE_READ_LIMIT):
+            return add_snapshot(tar, path, name, scratch, volatile)
+        tar.add(path, arcname=name, recursive=False)
     except (FileNotFoundError, NotADirectoryError):
-        return False
-    return True
+        return None
+    if regular and file_changed(path, before):
+        raise ValueError(f'File lớn thay đổi trong lúc đọc: {name}; đóng ứng dụng đang ghi file rồi chạy lại.')
+    return 'added'
+
+
+def add_snapshot(tar, path, name, scratch, volatile):
+    # A stream header cannot be corrected later, so fix the size locally.
+    with tempfile.TemporaryFile(dir=scratch) as snapshot:
+        for attempt in range(1 if volatile else STABLE_READ_ATTEMPTS):
+            if attempt:
+                time.sleep(STABLE_READ_DELAY)
+            snapshot.seek(0)
+            snapshot.truncate()
+            with path.open('rb') as source:
+                start = os.fstat(source.fileno())
+                shutil.copyfileobj(source, snapshot)
+                end = os.fstat(source.fileno())
+                info = tar.gettarinfo(arcname=name, fileobj=source)
+            stable = (start.st_size, start.st_mtime_ns) == (end.st_size, end.st_mtime_ns)
+            if stable:
+                break
+        if not stable and not volatile:
+            raise ValueError(f'File thay đổi trong lúc đọc: {name}; đóng ứng dụng hoặc thêm --volatile rồi chạy lại.')
+        info.size = snapshot.tell()
+        snapshot.seek(0)
+        tar.addfile(info, snapshot)
+    return 'added' if stable else 'changed'
 
 
 def file_changed(path, before):
@@ -347,7 +403,8 @@ def backup(args, home):
     remote = child_remote(args.remote, 'arch-' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ-') + uuid.uuid4().hex[:8])
     transfer.relative(cloud_folder)
     sync_dir = sync_directory(home, getattr(args, 'onedrive_dir', None))
-    exclusions = [home / '.cache', sync_dir / cloud_folder]
+    excluded = [*REPRODUCIBLE_PATHS, *map(transfer.relative, getattr(args, 'exclude', None) or [])]
+    exclusions = [home / '.cache', sync_dir / cloud_folder, *(home / name for name in excluded)]
     volatile_paths = transfer.roots([*VOLATILE_PATHS, *(getattr(args, 'volatile', None) or [])])
     names = transfer.roots(args.include or transfer.default_paths(home))
     for name in names:
@@ -395,15 +452,14 @@ def backup(args, home):
             with tarfile.open(fileobj=writer, mode='w|', dereference=False) as tar:
                 for path, name, before in home_entries(home, selected, exclusions, skipped):
                     volatile = is_volatile(name, volatile_paths)
-                    if not add_home_entry(tar, path, name, before, out, volatile):
+                    result = add_home_entry(tar, path, name, before, out, volatile)
+                    if result is None:
                         skipped.append(name)
                         continue
                     tar.inodes.clear()
                     if stat.S_ISLNK(before.st_mode):
                         links.append(name)
-                    if stat.S_ISREG(before.st_mode) and file_changed(path, before):
-                        if not volatile:
-                            raise ValueError(f'File thay đổi trong lúc đọc: {name}')
+                    if result == 'changed':
                         changed.append(name)
             archives['home.tar'] = writer.finish()
             warnings.append('Cache, filesystem con, symlink đích và bản cloud cũ không được sao lưu; xem skipped/symlinks.')
@@ -475,12 +531,17 @@ def restore(args, home):
         print('Đã xuất archive hệ thống vào', destination, '— không tự áp vào hệ thống.')
         return
     # Verify every archive before any write to the target home.
+    members = None
     for name, description in archives.items():
         print('Kiểm tra từ cloud:', name, flush=True)
-        ChunkReader(remote, description).verify()
+        reader = ChunkReader(remote, description)
+        if name == 'home.tar':
+            members = reader.scan_tar()
+        else:
+            reader.verify()
     reader = ChunkReader(remote, archives['home.tar'])
     with tarfile.open(fileobj=reader, mode='r:') as tar:
-        transfer.restore_tar(args, home, tar)
+        transfer.restore_tar(args, home, tar, members)
 
 
 def prune(args):
@@ -525,6 +586,7 @@ def main():
     b.add_argument('--include', action='append', help='Thay phạm vi home bằng các đường dẫn tương đối đã chọn')
     b.add_argument('--onedrive-dir', help='Thư mục sync local nếu dùng cấu hình client riêng; dùng để bỏ bản cloud cũ')
     b.add_argument('--volatile', action='append', help='Thêm đường dẫn tương đối được phép thay đổi khi backup (lưu bản chụp)')
+    b.add_argument('--exclude', action='append', help='Bỏ thêm đường dẫn tương đối khỏi backup, ví dụ --exclude OneDrive')
     p = sub.add_parser('prune', help='Xóa các thư mục backup cũ chưa có manifest')
     p.add_argument('--remote', default='archbackup:', help='Remote crypt trên OneDrive (mặc định archbackup:)')
     p.add_argument('--min-age-hours', type=int, default=24, help='Chỉ xóa bản cũ hơn số giờ này (mặc định 24)')

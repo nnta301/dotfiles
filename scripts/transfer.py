@@ -151,9 +151,9 @@ def mkdir_private(home, directory):
                 raise ValueError(f'Đường dẫn không phải thư mục: {current}')
 
 
-def restore_tar(args, home, tar):
+def restore_tar(args, home, tar, members=None):
     includes = roots(args.include) if args.include else None
-    members = tar.getmembers()
+    members = tar.getmembers() if members is None else members
     seen = set()
     for m in members:
         name = relative(m.name)
