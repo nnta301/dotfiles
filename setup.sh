@@ -29,7 +29,7 @@ DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Stow packages managed by this repo (personal override layer only)
 # NOTE: 'hypr' only contains UserConfigs/ and personal UserScripts — JaKooLit manages the core config.
-STOW_PACKAGES=(zsh nvim hypr fcitx5)
+STOW_PACKAGES=(zsh nvim hypr fcitx5 onedrive)
 
 # This personal repo targets the current RTX 2060 + stock linux kernel.
 # Patch only the downloaded installer, never an installed system driver.
@@ -182,9 +182,9 @@ stow_configs() {
 
         info "  Stowing: $pkg"
         local -a stow_options=()
-        # Avoid linking the entire fcitx5 directory into the repo: the input
-        # method writes runtime files alongside the managed profile.
-        if [[ "$pkg" == fcitx5 ]]; then
+        # Avoid linking these whole directories into the repo: fcitx5 writes
+        # runtime files there, and onedrive keeps its token and database there.
+        if [[ "$pkg" == fcitx5 || "$pkg" == onedrive ]]; then
             stow_options+=(--no-folding)
         fi
         if ! stow -d "$DOTFILES_DIR" -t "$HOME" "${stow_options[@]}" -R "$pkg"; then

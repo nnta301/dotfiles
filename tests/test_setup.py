@@ -1,5 +1,6 @@
 """Exercise setup functions without installing packages or touching real HOME."""
 import os
+import re
 from pathlib import Path
 import subprocess
 import shutil
@@ -75,6 +76,25 @@ class SetupTests(unittest.TestCase):
             self.assertTrue((config / 'profile').is_symlink())
             (config / 'runtime.conf').write_text('runtime')
             self.assertFalse((source / 'runtime.conf').exists())
+
+    @unittest.skipUnless(shutil.which('stow'), 'GNU Stow missing')
+    def test_onedrive_token_stays_out_of_checkout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); home = root / 'home'; home.mkdir()
+            repo = root / 'repo'; source = repo / 'onedrive/.config/onedrive'; source.mkdir(parents=True)
+            (source / 'config').write_text((REPO / 'onedrive/.config/onedrive/config').read_text())
+            result = self.run_function(root, 'DOTFILES_DIR="$1"\nSTOW_PACKAGES=(onedrive)\nstow_configs', repo)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            config = home / '.config/onedrive'
+            self.assertFalse(config.is_symlink())
+            self.assertTrue((config / 'config').is_symlink())
+            self.assertIn('skip_dir = "/ArchBackups"', (config / 'config').read_text())
+            (config / 'refresh_token').write_text('secret')
+            self.assertFalse((source / 'refresh_token').exists())
+
+    def test_onedrive_is_a_stow_package(self):
+        packages = re.search(r'^STOW_PACKAGES=\((.*)\)', (REPO / 'setup.sh').read_text(), re.M).group(1).split()
+        self.assertIn('onedrive', packages)
 
     @unittest.skipUnless(shutil.which('stow'), 'GNU Stow missing')
     def test_existing_folded_fcitx5_is_unfolded(self):

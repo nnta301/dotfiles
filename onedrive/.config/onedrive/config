@@ -1,0 +1,2 @@
+# Keep encrypted rclone backups out of the local sync folder.
+skip_dir = "/ArchBackups"

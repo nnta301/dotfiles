@@ -29,7 +29,8 @@ Repo này **không** theo dõi toàn bộ cấu hình Hyprland. Thay vào đó, 
 │  ├─ hypr/   → UserConfigs/ + UserScripts cá nhân              │
 │  ├─ zsh/    → .zshrc với Oh-My-Zsh + tất cả alias cá nhân      │
 │  ├─ nvim/   → Cấu hình LazyVim đầy đủ (độc lập với WM)         │
-│  └─ fcitx5/ → Profile bộ gõ tiếng Việt                         │
+│  ├─ fcitx5/ → Profile bộ gõ tiếng Việt                         │
+│  └─ onedrive/ → Bộ lọc đồng bộ, bỏ qua ArchBackups             │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -139,6 +140,7 @@ dotfiles/
 │           └── plugins/           ← các spec plugin tùy chỉnh
 │
 ├── 📂 fcitx5/                     ← Profile bộ gõ tiếng Việt
+├── 📂 onedrive/                   ← Stow package: bộ lọc client OneDrive
 └── 📂 scripts/                    ← Script tiện ích
     ├── cleanup.sh                 ← Dọn cache hệ thống và ứng dụng, có hỏi trước khi xóa
     ├── backup.sh                  ← Backup mã hóa lên OneDrive
